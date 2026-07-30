@@ -1,0 +1,1224 @@
+<title>AI Job Impact Predictor</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f7f7f4;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #1c5cab;
+    --mid: #f0efec;
+
+    /* Experience tiers are an ordered scale, so they take an ordinal blue
+       ramp rather than eight unrelated hues. Entry is darkest because it
+       carries the story. */
+    --lv-0: #104281;
+    --lv-1: #1c5cab;
+    --lv-2: #2a78d6;
+    --lv-3: #5598e7;
+    --lv-4: #86b6ef;
+
+    /* Diverging arms for signed values: red = fewer jobs, blue = more. */
+    --neg-1: #f7d9d8;
+    --neg-2: #eeadab;
+    --neg-3: #e2807e;
+    --neg-4: #cf5350;
+    --neg-5: #b03633;
+    --neg-6: #8a2422;
+    --pos-1: #cde2fb;
+    --pos-2: #9ec5f4;
+    --pos-3: #5598e7;
+    --pos-4: #2a78d6;
+    --pos-5: #184f95;
+
+    --font-ui: system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-data: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #6da7ec;
+      --mid: #383835;
+
+      --lv-0: #cde2fb;
+      --lv-1: #9ec5f4;
+      --lv-2: #6da7ec;
+      --lv-3: #3987e5;
+      --lv-4: #256abf;
+
+      --neg-1: #5a2220;
+      --neg-2: #7d2c2a;
+      --neg-3: #a33b38;
+      --neg-4: #c85b58;
+      --neg-5: #e08683;
+      --neg-6: #f0b3b1;
+      --pos-1: #17375f;
+      --pos-2: #1d4d87;
+      --pos-3: #2f74c4;
+      --pos-4: #5598e7;
+      --pos-5: #9ec5f4;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #6da7ec;
+    --mid: #383835;
+
+    --lv-0: #cde2fb;
+    --lv-1: #9ec5f4;
+    --lv-2: #6da7ec;
+    --lv-3: #3987e5;
+    --lv-4: #256abf;
+
+    --neg-1: #5a2220;
+    --neg-2: #7d2c2a;
+    --neg-3: #a33b38;
+    --neg-4: #c85b58;
+    --neg-5: #e08683;
+    --neg-6: #f0b3b1;
+    --pos-1: #17375f;
+    --pos-2: #1d4d87;
+    --pos-3: #2f74c4;
+    --pos-4: #5598e7;
+    --pos-5: #9ec5f4;
+  }
+
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    line-height: 1.5;
+    margin: 0;
+    padding: 0 20px 72px;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  header.masthead {
+    padding: 40px 0 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-data);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-size: clamp(26px, 4vw, 38px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+    font-weight: 640;
+  }
+
+  .standfirst {
+    color: var(--ink-2);
+    max-width: 68ch;
+    margin: 0;
+    font-size: 16px;
+  }
+
+  h2 {
+    font-size: 19px;
+    letter-spacing: -0.01em;
+    margin: 0;
+    font-weight: 620;
+    text-wrap: balance;
+  }
+
+  .note { color: var(--ink-2); font-size: 14px; margin: 0; max-width: 74ch; }
+
+  /* ---- filter row: one row above everything it scopes ---- */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    align-items: flex-end;
+    padding: 20px;
+    margin: 24px 0 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+  .field > span {
+    font-family: var(--font-data);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  select {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--page);
+    border: 1px solid var(--axis);
+    border-radius: 3px;
+    padding: 7px 9px;
+    min-width: 172px;
+    max-width: 260px;
+  }
+
+  select:focus-visible,
+  button:focus-visible,
+  input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- summary band ---- */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--tile-accent, var(--axis));
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .tile .label {
+    font-family: var(--font-data);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .tile .value { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+  .tile .sub { font-size: 12px; color: var(--ink-2); }
+
+  /* ---- chart cards ---- */
+  section.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+
+  .card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+
+  .toggle {
+    font-family: var(--font-data);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    background: transparent;
+    border: 1px solid var(--axis);
+    border-radius: 3px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+
+  .toggle:hover { color: var(--ink); border-color: var(--ink-2); }
+
+  .plot { margin-top: 16px; overflow-x: auto; }
+  svg { display: block; max-width: 100%; height: auto; }
+  svg text { font-family: var(--font-data); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+
+  .legend .key { display: flex; align-items: center; gap: 7px; }
+  /* The ring keeps the neutral "little change" swatch visible against the
+     surface it is nearly the same colour as. */
+  .legend .swatch {
+    width: 11px;
+    height: 11px;
+    border-radius: 2px;
+    flex: none;
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+
+  /* ---- table twins ---- */
+  .table-wrap { overflow-x: auto; margin-top: 16px; }
+  table { border-collapse: collapse; font-size: 13px; width: 100%; }
+  caption { text-align: left; color: var(--ink-2); font-size: 13px; padding-bottom: 10px; }
+  th, td { padding: 6px 12px 6px 0; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; padding-right: 20px; }
+  thead th { border-bottom: 1px solid var(--axis); color: var(--muted); font-weight: 500;
+             font-family: var(--font-data); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+  tbody td { border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; font-family: var(--font-data); }
+  tbody td:first-child { font-family: var(--font-ui); }
+  [hidden] { display: none !important; }
+
+  /* ---- org planner ---- */
+  .planner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .planner-grid label { display: flex; flex-direction: column; gap: 5px; }
+
+  .planner-grid span {
+    font-family: var(--font-data);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  input[type="number"] {
+    font-family: var(--font-data);
+    font-size: 15px;
+    color: var(--ink);
+    background: var(--page);
+    border: 1px solid var(--axis);
+    border-radius: 3px;
+    padding: 8px 9px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .planner-out {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--grid);
+  }
+
+  .headline-figure {
+    font-size: 34px;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+  }
+
+  /* ---- method ---- */
+  .method { display: grid; gap: 12px; }
+  .method h3 { font-size: 14px; margin: 14px 0 0; font-weight: 620; }
+  .method p, .method li { font-size: 14px; color: var(--ink-2); margin: 0; }
+  .method ul { margin: 0; padding-left: 20px; display: grid; gap: 7px; }
+  .method a { color: var(--accent); }
+
+  .caveat {
+    border-left: 3px solid var(--neg-4);
+    padding: 2px 0 2px 15px;
+    display: grid;
+    gap: 8px;
+  }
+
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--axis);
+    border-radius: 4px;
+    padding: 8px 11px;
+    font-size: 12px;
+    font-family: var(--font-data);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+    z-index: 60;
+    opacity: 0;
+    transition: opacity 0.09s;
+    max-width: 260px;
+  }
+
+  .tooltip strong { font-family: var(--font-ui); display: block; margin-bottom: 3px; font-size: 12px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+
+  footer { color: var(--muted); font-size: 12px; padding-top: 18px; border-top: 1px solid var(--border); }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <span class="eyebrow">Scenario model &middot; 2026&ndash;2030</span>
+    <h1>What AI does to jobs, by experience level and jurisdiction</h1>
+    <p class="standfirst">
+      Every number here is employment measured against a <strong>no-AI counterfactual</strong> &mdash; how
+      many more or fewer people are doing this job than would have been, absent AI. It is not a forecast of
+      unemployment. The model runs live in this page; the entry-level gradient is fitted to observed
+      payroll data rather than assumed.
+    </p>
+  </header>
+
+  <div class="filters">
+    <label class="field">
+      <span>Job type</span>
+      <select id="f-occupation"></select>
+    </label>
+    <label class="field">
+      <span>Jurisdiction</span>
+      <select id="f-jurisdiction"></select>
+    </label>
+    <label class="field">
+      <span>Year</span>
+      <select id="f-year"></select>
+    </label>
+    <label class="field">
+      <span>Deployment speed</span>
+      <select id="f-scenario"></select>
+    </label>
+    <label class="field">
+      <span>Measure</span>
+      <select id="f-measure">
+        <option value="netChange">Headcount</option>
+        <option value="hiringChange">Annual openings</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 id="traj-title">Trajectory by experience level</h2>
+      <button class="toggle" data-twin="traj">Table view</button>
+    </div>
+    <p class="note" id="traj-note"></p>
+    <div class="plot" id="traj-plot"></div>
+    <div class="legend" id="traj-legend"></div>
+    <div class="table-wrap" id="traj-table" hidden></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 id="heat-title">Every market, every level</h2>
+      <button class="toggle" data-twin="heat">Table view</button>
+    </div>
+    <p class="note">
+      The same job type across all twelve jurisdictions. Institutions change the timing and the depth of
+      the effect, not its direction &mdash; no labour market in the model escapes it, and none is spared at
+      the entry level.
+    </p>
+    <div class="plot" id="heat-plot"></div>
+    <div class="legend" id="heat-legend"></div>
+    <div class="table-wrap" id="heat-table" hidden></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h2 id="rank-title">Which job types move</h2>
+      <button class="toggle" data-twin="rank">Table view</button>
+    </div>
+    <p class="note" id="rank-note"></p>
+    <div class="plot" id="rank-plot"></div>
+    <div class="table-wrap" id="rank-table" hidden></div>
+  </section>
+
+  <section class="card">
+    <h2>Your org, in people</h2>
+    <p class="note">
+      Enter current headcount for the selected job type. The model applies that cell's projected change and
+      returns people, because a hiring plan is denominated in people rather than percentages.
+    </p>
+    <div class="planner-grid" id="planner-inputs"></div>
+    <div class="planner-out" id="planner-out"></div>
+  </section>
+
+  <section class="card method">
+    <h2>How this works, and what it cannot tell you</h2>
+
+    <h3>The four steps</h3>
+    <p>
+      For each job type, experience level, jurisdiction and year, the model computes:
+      <strong>exposure</strong> (what share of the work AI can do at all), then the split between work AI
+      <strong>automates</strong> and work it merely <strong>augments</strong>; <strong>deployment</strong>
+      (a logistic curve capped by each jurisdiction's capacity, because exposure is potential and
+      deployment is what actually happens); <strong>displacement</strong> (deployed automation becomes a
+      headcount change only as fast as institutions allow); and <strong>reinstatement</strong> (a lagged
+      offset as cheaper output raises demand and new AI-adjacent roles appear).
+    </p>
+
+    <h3>Why the entry level takes it hardest</h3>
+    <p>
+      Two mechanisms compound. AI is best at the codified, reviewable work junior staff are hired to do.
+      And junior headcount adjusts through <em>hiring</em> &mdash; which has no notice period, no severance
+      and no works council &mdash; while senior headcount can only be adjusted by dismissal, which is slow
+      and expensive everywhere. That second mechanism, not the first, is what produces a collapsing junior
+      tier beside a stable experienced one.
+    </p>
+
+    <h3>Calibration</h3>
+    <p>
+      The experience gradient is fitted, not assumed. Brynjolfsson, Chandar &amp; Chen measured a ~16%
+      relative employment decline for workers aged 22&ndash;25 in the most AI-exposed occupations using ADP
+      payroll microdata, with experienced workers in the same occupations holding steady, adjustment
+      running through employment rather than pay, and declines concentrated where AI automates rather than
+      augments. The model's parameters are set so it reproduces that result, and a test asserts the fit
+      still holds.
+    </p>
+
+    <h3>Sources</h3>
+    <ul>
+      <li>Task exposure and the automation/augmentation split &mdash; <a href="https://www.ilo.org/publications/generative-ai-and-jobs-refined-global-index-occupational-exposure">ILO Working Paper 140 (2025)</a>, a refined global index built from ~30,000 tasks and ~50,000 human assessments.</li>
+      <li>The experience gradient &mdash; <a href="https://digitaleconomy.stanford.edu/publication/canaries-in-the-coal-mine-six-facts-about-the-recent-employment-effects-of-artificial-intelligence/">Brynjolfsson, Chandar &amp; Chen, &ldquo;Canaries in the Coal Mine?&rdquo;</a> (Stanford Digital Economy Lab), ADP microdata through April 2026.</li>
+      <li>Deployment capacity &mdash; <a href="https://www.imf.org/external/datamapper/datasets/AIPI">IMF AI Preparedness Index</a>, 174 economies.</li>
+      <li>Adjustment friction &mdash; <a href="https://www.oecd.org/en/data/datasets/oecd-indicators-of-employment-protection.html">OECD Indicators of Employment Protection</a> (EPRC, regular contracts).</li>
+      <li>EU deployment timing reflects the AI Act's Annex III high-risk obligations moving from August 2026 to December 2027.</li>
+    </ul>
+
+    <h3>What this is not</h3>
+    <div class="caveat">
+      <p>
+        <strong>A structured scenario, not a forecast.</strong> The parameters are anchored on published
+        research, but the combination of them is a modelling judgement, and several inputs are estimates
+        rather than measurements.
+      </p>
+      <p>
+        <strong>Only the generative-AI channel.</strong> Robotics and physical automation are out of scope,
+        which is the only reason skilled trades and warehouse work look quiet here.
+      </p>
+      <p>
+        <strong>Job creation is the weakest assumption.</strong> History says automation eventually creates
+        as much work as it destroys, but &ldquo;eventually&rdquo; has run to decades and five years sits
+        well inside that lag. The model assumes a partial offset. Assume a full one and most cells turn
+        positive by 2030; assume a small one and almost nothing recovers.
+      </p>
+      <p>
+        <strong>Beyond about 2028 there is no observational support</strong> &mdash; the diffusion curves are
+        extrapolation. Treat the ordering of cells as more trustworthy than the magnitudes, and the
+        magnitudes as more trustworthy than any single number.
+      </p>
+    </div>
+  </section>
+
+  <footer>
+    Model source and tests: <span style="font-family: var(--font-data)">ai_job_predictor</span>. This page
+    runs the same model as the command-line tool, so any cell here can be reproduced with
+    <span style="font-family: var(--font-data)">node src/cli.js</span>.
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+
+<script type="module">
+/* __MODEL_SOURCE__ */
+
+const $ = (id) => document.getElementById(id);
+const tooltip = $('tooltip');
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+const LEVEL_COLORS = ['--lv-0', '--lv-1', '--lv-2', '--lv-3', '--lv-4'];
+const NEG_STEPS = ['--neg-1', '--neg-2', '--neg-3', '--neg-4', '--neg-5', '--neg-6'];
+const POS_STEPS = ['--pos-1', '--pos-2', '--pos-3', '--pos-4', '--pos-5'];
+
+const state = {
+  occupation: 'Software engineering',
+  jurisdiction: 'United States',
+  year: 2030,
+  scenario: 'central',
+  measure: 'netChange',
+  org: {},
+};
+
+const fmtPct = (x) => `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toFixed(1)}%`;
+const fmtPeople = (x) => `${x >= 0 ? '+' : '−'}${Math.abs(x).toFixed(0)}`;
+const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+const el = (tag, attrs = {}, text) => {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+function measureLabel() {
+  return state.measure === 'netChange' ? 'headcount' : 'annual openings';
+}
+
+function rowsFor(filter = {}) {
+  return project({ scenario: state.scenario }).filter((r) =>
+    Object.entries(filter).every(([k, v]) => r[k] === v),
+  );
+}
+
+let cachedScenario = null;
+let cachedRows = null;
+function allRows() {
+  if (cachedScenario !== state.scenario) {
+    cachedRows = project({ scenario: state.scenario });
+    cachedScenario = state.scenario;
+  }
+  return cachedRows;
+}
+
+function showTip(event, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.opacity = '1';
+  const pad = 14;
+  const rect = tooltip.getBoundingClientRect();
+  let x = event.clientX + pad;
+  let y = event.clientY + pad;
+  if (x + rect.width > window.innerWidth - 8) x = event.clientX - rect.width - pad;
+  if (y + rect.height > window.innerHeight - 8) y = event.clientY - rect.height - pad;
+  tooltip.style.left = `${x}px`;
+  tooltip.style.top = `${y}px`;
+}
+
+const hideTip = () => { tooltip.style.opacity = '0'; };
+
+/* ---------- summary tiles ---------- */
+
+function renderTiles() {
+  const rows = allRows().filter(
+    (r) => r.occupation === state.occupation && r.jurisdiction === state.jurisdiction && r.year === state.year,
+  );
+  const container = $('tiles');
+  container.replaceChildren();
+
+  rows.forEach((row, i) => {
+    const value = row[state.measure];
+    const tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.style.setProperty('--tile-accent', cssVar(LEVEL_COLORS[i]));
+
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = row.experience;
+
+    const val = document.createElement('div');
+    val.className = 'value';
+    val.textContent = fmtPct(value);
+
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent =
+      state.measure === 'netChange'
+        ? `openings ${fmtPct(row.hiringChange)}`
+        : `headcount ${fmtPct(row.netChange)}`;
+
+    tile.append(label, val, sub);
+    container.append(tile);
+  });
+}
+
+/* ---------- chart 1: trajectory lines ---------- */
+
+function renderTrajectory() {
+  const width = 920;
+  const height = 380;
+  const m = { top: 20, right: 186, bottom: 44, left: 62 };
+  const years = PROJECTION_YEARS;
+
+  const series = EXPERIENCE_LEVELS.map((level, i) => ({
+    name: level.name,
+    color: cssVar(LEVEL_COLORS[i]),
+    points: years.map((year) => {
+      const row = allRows().find(
+        (r) =>
+          r.occupation === state.occupation &&
+          r.jurisdiction === state.jurisdiction &&
+          r.experience === level.name &&
+          r.year === year,
+      );
+      return { year, value: row[state.measure] };
+    }),
+  }));
+
+  const values = series.flatMap((s) => s.points.map((p) => p.value));
+  const lo = Math.min(-0.05, ...values);
+  const hi = Math.max(0.05, ...values);
+  const pad = (hi - lo) * 0.08;
+  const yMin = lo - pad;
+  const yMax = hi + pad;
+
+  const x = (year) =>
+    m.left + ((year - years[0]) / (years[years.length - 1] - years[0])) * (width - m.left - m.right);
+  const y = (v) => m.top + ((yMax - v) / (yMax - yMin)) * (height - m.top - m.bottom);
+
+  const svg = el('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    width,
+    height,
+    role: 'img',
+    'aria-label': `Projected change in ${measureLabel()} for ${state.occupation} in ${state.jurisdiction}, by experience level, 2026 to 2030`,
+  });
+
+  // gridlines: solid hairlines, one shade off the surface
+  const ticks = 6;
+  for (let i = 0; i <= ticks; i += 1) {
+    const v = yMin + ((yMax - yMin) * i) / ticks;
+    svg.append(
+      el('line', {
+        x1: m.left, x2: width - m.right, y1: y(v), y2: y(v),
+        stroke: cssVar('--grid'), 'stroke-width': 1,
+      }),
+    );
+    svg.append(
+      el('text', {
+        x: m.left - 10, y: y(v) + 4, 'text-anchor': 'end',
+        fill: cssVar('--muted'), 'font-size': 11,
+      }, `${(v * 100).toFixed(0)}%`),
+    );
+  }
+
+  // zero line reads as the counterfactual, so it is emphasised
+  svg.append(
+    el('line', {
+      x1: m.left, x2: width - m.right, y1: y(0), y2: y(0),
+      stroke: cssVar('--axis'), 'stroke-width': 1.5,
+    }),
+  );
+  svg.append(
+    el('text', {
+      x: m.left + 6, y: y(0) - 7, fill: cssVar('--muted'), 'font-size': 10,
+    }, 'no-AI baseline'),
+  );
+
+  for (const year of years) {
+    svg.append(
+      el('text', {
+        x: x(year), y: height - m.bottom + 20, 'text-anchor': 'middle',
+        fill: cssVar('--muted'), 'font-size': 11,
+      }, String(year)),
+    );
+  }
+
+  for (const s of series) {
+    const d = s.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.year)},${y(p.value)}`).join(' ');
+    svg.append(
+      el('path', {
+        d, fill: 'none', stroke: s.color, 'stroke-width': 2,
+        'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+      }),
+    );
+
+    for (const p of s.points) {
+      // 2px surface ring keeps overlapping markers separable
+      svg.append(el('circle', { cx: x(p.year), cy: y(p.value), r: 5.5, fill: cssVar('--surface') }));
+      svg.append(el('circle', { cx: x(p.year), cy: y(p.value), r: 3.6, fill: s.color }));
+    }
+
+  }
+
+  // Direct endpoint labels: identity never rests on colour alone. Series
+  // converge at the right edge, so nudge labels apart before drawing rather
+  // than letting them stack on top of each other.
+  const minGap = 15;
+  const labels = series
+    .map((s) => {
+      const last = s.points[s.points.length - 1];
+      return { name: s.name, color: s.color, value: last.value, x: x(last.year) + 12, y: y(last.value) };
+    })
+    .sort((a, b) => a.y - b.y);
+
+  for (let i = 1; i < labels.length; i += 1) {
+    if (labels[i].y - labels[i - 1].y < minGap) labels[i].y = labels[i - 1].y + minGap;
+  }
+  const overflow = labels[labels.length - 1].y - (height - m.bottom);
+  if (overflow > 0) for (const label of labels) label.y -= overflow;
+
+  for (const label of labels) {
+    // A leader line keeps a nudged label tied to its own endpoint.
+    svg.append(
+      el('line', {
+        x1: label.x - 7, x2: label.x - 2, y1: y(label.value), y2: label.y,
+        stroke: label.color, 'stroke-width': 1,
+      }),
+    );
+    svg.append(
+      el('text', {
+        x: label.x, y: label.y + 4, fill: cssVar('--ink-2'), 'font-size': 11,
+      }, `${label.name} ${fmtPct(label.value)}`),
+    );
+  }
+
+  // hover: one generous band per year, well past the 24px minimum
+  const bandWidth = (width - m.left - m.right) / (years.length - 1);
+  years.forEach((year) => {
+    const band = el('rect', {
+      x: x(year) - bandWidth / 2, y: m.top,
+      width: bandWidth, height: height - m.top - m.bottom,
+      fill: 'transparent', style: 'cursor: crosshair',
+    });
+    band.addEventListener('mousemove', (event) => {
+      const lines = series
+        .map((s) => {
+          const p = s.points.find((q) => q.year === year);
+          return `<div><span style="color:${s.color}">●</span> ${s.name} &nbsp;${fmtPct(p.value)}</div>`;
+        })
+        .join('');
+      showTip(event, `<strong>${year} &middot; ${measureLabel()}</strong>${lines}`);
+    });
+    band.addEventListener('mouseleave', hideTip);
+    svg.append(band);
+  });
+
+  const plot = $('traj-plot');
+  plot.replaceChildren(svg);
+
+  const legend = $('traj-legend');
+  legend.replaceChildren();
+  for (const s of series) {
+    const key = document.createElement('span');
+    key.className = 'key';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = s.color;
+    const text = document.createElement('span');
+    text.textContent = s.name;
+    key.append(sw, text);
+    legend.append(key);
+  }
+
+  $('traj-title').textContent = `${state.occupation} in ${state.jurisdiction}`;
+  $('traj-note').textContent =
+    `Change in ${measureLabel()} against the no-AI counterfactual, year by year. ` +
+    (state.measure === 'hiringChange'
+      ? 'Openings recover as the level finishes shrinking — the headcount stays down, but replacement hiring resumes.'
+      : 'The gap between the top and bottom lines is the story: the same technology, the same market, a different career stage.');
+
+  buildTable('traj-table', {
+    caption: `Change in ${measureLabel()}, ${state.occupation}, ${state.jurisdiction}`,
+    columns: ['Experience level', ...years.map(String)],
+    rows: series.map((s) => [s.name, ...s.points.map((p) => fmtPct(p.value))]),
+  });
+}
+
+/* ---------- chart 2: jurisdiction x level heatmap ---------- */
+
+function divergingColor(value, maxAbs) {
+  if (Math.abs(value) < 1e-6) return cssVar('--mid');
+  const t = Math.min(1, Math.abs(value) / maxAbs);
+  const steps = value < 0 ? NEG_STEPS : POS_STEPS;
+  const index = Math.min(steps.length - 1, Math.floor(t * steps.length));
+  return cssVar(steps[index]);
+}
+
+function darkStep(value, maxAbs) {
+  const t = Math.min(1, Math.abs(value) / maxAbs);
+  const steps = value < 0 ? NEG_STEPS.length : POS_STEPS.length;
+  return Math.floor(t * steps) >= steps - 2;
+}
+
+function renderHeatmap() {
+  const rows = allRows().filter((r) => r.occupation === state.occupation && r.year === state.year);
+  const levels = EXPERIENCE_LEVELS.map((l) => l.name);
+  const markets = JURISDICTIONS.map((j) => j.name);
+
+  const cellW = 128;
+  const cellH = 38;
+  const left = 168;
+  const top = 34;
+  const width = left + cellW * levels.length + 12;
+  const height = top + cellH * markets.length + 10;
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(r[state.measure])), 0.01);
+
+  const svg = el('svg', {
+    viewBox: `0 0 ${width} ${height}`, width, height, role: 'img',
+    'aria-label': `Change in ${measureLabel()} for ${state.occupation} in ${state.year}, by jurisdiction and experience level`,
+  });
+
+  levels.forEach((level, c) => {
+    svg.append(
+      el('text', {
+        x: left + c * cellW + cellW / 2, y: top - 12, 'text-anchor': 'middle',
+        fill: cssVar('--muted'), 'font-size': 11,
+      }, level),
+    );
+  });
+
+  markets.forEach((market, r) => {
+    svg.append(
+      el('text', {
+        x: left - 12, y: top + r * cellH + cellH / 2 + 4, 'text-anchor': 'end',
+        fill: market === state.jurisdiction ? cssVar('--ink') : cssVar('--ink-2'),
+        'font-size': 12,
+        'font-weight': market === state.jurisdiction ? 700 : 400,
+      }, market),
+    );
+
+    levels.forEach((level, c) => {
+      const row = rows.find((x) => x.jurisdiction === market && x.experience === level);
+      const value = row[state.measure];
+      const group = el('g', { style: 'cursor: default' });
+      // 2px gap between fills instead of borders
+      group.append(
+        el('rect', {
+          x: left + c * cellW + 1, y: top + r * cellH + 1,
+          width: cellW - 2, height: cellH - 2, rx: 2,
+          fill: divergingColor(value, maxAbs),
+        }),
+      );
+      group.append(
+        el('text', {
+          x: left + c * cellW + cellW / 2, y: top + r * cellH + cellH / 2 + 4,
+          'text-anchor': 'middle', 'font-size': 11.5,
+          fill: darkStep(value, maxAbs) ? cssVar('--surface') : cssVar('--ink'),
+        }, fmtPct(value)),
+      );
+      group.addEventListener('mousemove', (event) =>
+        showTip(
+          event,
+          `<strong>${market} &middot; ${level}</strong>` +
+            `${state.occupation}, ${state.year}<br>` +
+            `Headcount ${fmtPct(row.netChange)}<br>` +
+            `Openings ${fmtPct(row.hiringChange)}<br>` +
+            `AI deployed against ${(row.deployment * 100).toFixed(0)}% of automatable work`,
+        ),
+      );
+      group.addEventListener('mouseleave', hideTip);
+      svg.append(group);
+    });
+  });
+
+  $('heat-plot').replaceChildren(svg);
+  $('heat-title').textContent = `${state.occupation}: every market, every level, ${state.year}`;
+
+  const legend = $('heat-legend');
+  legend.replaceChildren();
+  const scale = [
+    ['Fewer jobs', cssVar('--neg-5')],
+    ['Little change', cssVar('--mid')],
+    ['More jobs', cssVar('--pos-4')],
+  ];
+  for (const [name, color] of scale) {
+    const key = document.createElement('span');
+    key.className = 'key';
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.style.background = color;
+    const text = document.createElement('span');
+    text.textContent = name;
+    key.append(sw, text);
+    legend.append(key);
+  }
+
+  buildTable('heat-table', {
+    caption: `Change in ${measureLabel()}, ${state.occupation}, ${state.year}`,
+    columns: ['Jurisdiction', ...levels],
+    rows: markets.map((market) => [
+      market,
+      ...levels.map((level) =>
+        fmtPct(rows.find((x) => x.jurisdiction === market && x.experience === level)[state.measure]),
+      ),
+    ]),
+  });
+}
+
+/* ---------- chart 3: job-type ranking ---------- */
+
+function renderRanking() {
+  const level = $('f-level') ? $('f-level').value : 'Entry';
+  const rows = allRows()
+    .filter(
+      (r) => r.jurisdiction === state.jurisdiction && r.year === state.year && r.experience === level,
+    )
+    .sort((a, b) => a[state.measure] - b[state.measure]);
+
+  const barH = 24;
+  const gap = 6;
+  const width = 920;
+  // Name gutter, then a value gutter wide enough that a full-length negative
+  // bar's label never reaches the names.
+  const nameGutter = 236;
+  const plotLeft = nameGutter + 56;
+  const plotRight = width - 56;
+  const zeroX = (plotLeft + plotRight) / 2;
+  const half = (plotRight - plotLeft) / 2;
+  const height = rows.length * (barH + gap) + 20;
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(r[state.measure])), 0.01);
+  const scale = (v) => (v / maxAbs) * half;
+  const truncate = (name) => (name.length > 30 ? `${name.slice(0, 29)}…` : name);
+
+  const svg = el('svg', {
+    viewBox: `0 0 ${width} ${height}`, width, height, role: 'img',
+    'aria-label': `Change in ${measureLabel()} by job type for ${level} staff in ${state.jurisdiction}, ${state.year}`,
+  });
+
+  svg.append(
+    el('line', { x1: zeroX, x2: zeroX, y1: 4, y2: height - 12, stroke: cssVar('--axis'), 'stroke-width': 1.5 }),
+  );
+
+  rows.forEach((row, i) => {
+    const value = row[state.measure];
+    const y = 8 + i * (barH + gap);
+    const w = Math.abs(scale(value));
+    const x = value < 0 ? zeroX - w : zeroX;
+    const color = value < 0 ? cssVar('--neg-4') : cssVar('--pos-4');
+
+    svg.append(
+      el('text', {
+        x: nameGutter, y: y + barH / 2 + 4, 'text-anchor': 'end',
+        fill: row.occupation === state.occupation ? cssVar('--ink') : cssVar('--ink-2'),
+        'font-size': 12,
+        'font-weight': row.occupation === state.occupation ? 700 : 400,
+      }, truncate(row.occupation)),
+    );
+
+    const group = el('g');
+    group.append(el('rect', { x, y, width: Math.max(w, 1), height: barH, rx: 3, fill: color }));
+    group.append(
+      el('text', {
+        x: value < 0 ? x - 8 : x + w + 8, y: y + barH / 2 + 4,
+        'text-anchor': value < 0 ? 'end' : 'start',
+        fill: cssVar('--ink-2'), 'font-size': 11,
+      }, fmtPct(value)),
+    );
+    // hit target spans the full row, not just the bar
+    const hit = el('rect', {
+      x: 0, y: y - gap / 2, width, height: barH + gap,
+      fill: 'transparent', style: 'cursor: default',
+    });
+    hit.addEventListener('mousemove', (event) =>
+      showTip(
+        event,
+        `<strong>${row.occupation}</strong>${level}, ${state.jurisdiction}, ${state.year}<br>` +
+          `Headcount ${fmtPct(row.netChange)}<br>Openings ${fmtPct(row.hiringChange)}`,
+      ),
+    );
+    hit.addEventListener('mouseleave', hideTip);
+    group.append(hit);
+    svg.append(group);
+  });
+
+  $('rank-plot').replaceChildren(svg);
+  $('rank-title').textContent = `Job types ranked — ${level} staff, ${state.jurisdiction}, ${state.year}`;
+  $('rank-note').textContent =
+    `Change in ${measureLabel()} for every job type in the model, worst first. Physical and in-person work ` +
+    `sits near zero only because this model covers generative AI, not robotics.`;
+
+  buildTable('rank-table', {
+    caption: `Change in ${measureLabel()} by job type, ${level}, ${state.jurisdiction}, ${state.year}`,
+    columns: ['Job type', 'Headcount', 'Openings'],
+    rows: rows.map((r) => [r.occupation, fmtPct(r.netChange), fmtPct(r.hiringChange)]),
+  });
+}
+
+/* ---------- org planner ---------- */
+
+function renderPlanner() {
+  const container = $('planner-inputs');
+  if (!container.dataset.built) {
+    for (const level of EXPERIENCE_LEVELS) {
+      const label = document.createElement('label');
+      const span = document.createElement('span');
+      span.textContent = level.name;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.step = '1';
+      input.value = String({ Entry: 40, Junior: 30, Mid: 25, Senior: 15, 'Lead / Executive': 6 }[level.name]);
+      input.dataset.level = level.name;
+      state.org[level.name] = Number(input.value);
+      input.addEventListener('input', () => {
+        state.org[level.name] = Math.max(0, Number(input.value) || 0);
+        renderPlannerOutput();
+      });
+      label.append(span, input);
+      container.append(label);
+    }
+    container.dataset.built = '1';
+  }
+  renderPlannerOutput();
+}
+
+function renderPlannerOutput() {
+  const shape = { [state.occupation]: { ...state.org } };
+  const rows = allRows().filter((r) => r.jurisdiction === state.jurisdiction);
+  const result = orgImpact(rows, shape, state.year);
+  const out = $('planner-out');
+  out.replaceChildren();
+
+  const figure = document.createElement('div');
+  figure.className = 'headline-figure';
+  figure.textContent = `${fmtPeople(result.totalDelta)} people`;
+
+  const sub = document.createElement('p');
+  sub.className = 'note';
+  sub.textContent =
+    `On a team of ${result.totalBaseline} in ${state.occupation}, ${state.jurisdiction}, by ${state.year} ` +
+    `— a ${fmtPct(result.totalChange)} change against the no-AI counterfactual. ` +
+    `The distribution across levels matters more than the total.`;
+
+  out.append(figure, sub);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'table-wrap';
+  const table = document.createElement('table');
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  for (const h of ['Level', 'Now', `${state.year}`, 'Change', 'Openings']) {
+    const th = document.createElement('th');
+    th.textContent = h;
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  const tbody = document.createElement('tbody');
+  const order = EXPERIENCE_LEVELS.map((l) => l.name);
+  for (const line of [...result.lines].sort((a, b) => order.indexOf(a.experience) - order.indexOf(b.experience))) {
+    const tr = document.createElement('tr');
+    for (const cell of [
+      line.experience,
+      String(line.baseline),
+      line.projected.toFixed(1),
+      `${fmtPeople(line.delta)} (${fmtPct(line.netChange)})`,
+      fmtPct(line.hiringChange),
+    ]) {
+      const td = document.createElement('td');
+      td.textContent = cell;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  wrap.append(table);
+  out.append(wrap);
+}
+
+/* ---------- table twins ---------- */
+
+function buildTable(id, { caption, columns, rows }) {
+  const host = $(id);
+  const table = document.createElement('table');
+  const cap = document.createElement('caption');
+  cap.textContent = caption;
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  for (const c of columns) {
+    const th = document.createElement('th');
+    th.textContent = c;
+    th.scope = 'col';
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  const tbody = document.createElement('tbody');
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    r.forEach((cell, i) => {
+      const td = document.createElement(i === 0 ? 'th' : 'td');
+      if (i === 0) td.scope = 'row';
+      td.textContent = cell;
+      tr.append(td);
+    });
+    tbody.append(tr);
+  }
+  table.append(cap, thead, tbody);
+  host.replaceChildren(table);
+}
+
+/* ---------- wiring ---------- */
+
+function fillSelect(select, values, selected) {
+  select.replaceChildren();
+  for (const value of values) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    if (value === selected) option.selected = true;
+    select.append(option);
+  }
+}
+
+function renderAll() {
+  renderTiles();
+  renderTrajectory();
+  renderHeatmap();
+  renderRanking();
+  renderPlanner();
+}
+
+function init() {
+  fillSelect($('f-occupation'), OCCUPATIONS.map((o) => o.name), state.occupation);
+  fillSelect($('f-jurisdiction'), JURISDICTIONS.map((j) => j.name), state.jurisdiction);
+  fillSelect($('f-year'), PROJECTION_YEARS.map(String), String(state.year));
+  fillSelect($('f-scenario'), Object.keys(SCENARIOS), state.scenario);
+
+  // The ranking chart needs its own level selector; it lives in the same
+  // filter row rather than inside the card.
+  const field = document.createElement('label');
+  field.className = 'field';
+  const span = document.createElement('span');
+  span.textContent = 'Level (ranking)';
+  const select = document.createElement('select');
+  select.id = 'f-level';
+  field.append(span, select);
+  $('f-measure').closest('.field').after(field);
+  fillSelect(select, EXPERIENCE_LEVELS.map((l) => l.name), 'Entry');
+  select.addEventListener('change', renderRanking);
+
+  $('f-occupation').addEventListener('change', (e) => { state.occupation = e.target.value; renderAll(); });
+  $('f-jurisdiction').addEventListener('change', (e) => { state.jurisdiction = e.target.value; renderAll(); });
+  $('f-year').addEventListener('change', (e) => { state.year = Number(e.target.value); renderAll(); });
+  $('f-scenario').addEventListener('change', (e) => { state.scenario = e.target.value; renderAll(); });
+  $('f-measure').addEventListener('change', (e) => { state.measure = e.target.value; renderAll(); });
+
+  for (const button of document.querySelectorAll('.toggle')) {
+    button.addEventListener('click', () => {
+      const twin = button.dataset.twin;
+      const table = $(`${twin}-table`);
+      const plot = $(`${twin}-plot`);
+      const legend = $(`${twin}-legend`);
+      const showTable = table.hidden;
+      table.hidden = !showTable;
+      plot.hidden = showTable;
+      if (legend) legend.hidden = showTable;
+      button.textContent = showTable ? 'Chart view' : 'Table view';
+    });
+  }
+
+  renderAll();
+  // Colours are read from CSS custom properties, so a theme change has to
+  // re-render the SVG marks.
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderAll);
+  new MutationObserver(renderAll).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+}
+
+init();
+</script>

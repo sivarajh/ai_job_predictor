@@ -1,0 +1,27 @@
+{
+  "name": "ai-job-predictor",
+  "version": "0.1.0",
+  "description": "Scenario model for AI's effect on employment by job type, experience level, jurisdiction and year, 2026-2030",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "ai-job-predictor": "./bin/ai-job-predictor.js"
+  },
+  "exports": {
+    ".": "./src/model.js",
+    "./parameters": "./src/parameters.js",
+    "./report": "./src/report.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/cli.js",
+    "export": "node src/cli.js --csv outputs/projections.csv"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src",
+    "bin"
+  ]
+}
