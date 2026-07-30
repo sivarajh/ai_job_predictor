@@ -50,11 +50,12 @@ jobs:
           fi
           echo "site/index.html looks well-formed"
 
-      # enablement turns Pages on via the API if it is not already, so the
-      # first run does not need anyone to visit repository settings.
+      # Pages must already be enabled for the repository, with its source set
+      # to GitHub Actions (Settings -> Pages -> Build and deployment).
+      # Enabling it from here is not possible: the workflow token cannot
+      # create the Pages site and the API returns "Resource not accessible by
+      # integration", which fails the run rather than bootstrapping it.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
