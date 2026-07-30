@@ -1,0 +1,71 @@
+name: Deploy web app
+
+# Deployment is gated on the test suite, which includes the calibration
+# test - so a parameter change that breaks the fit to observed data cannot
+# reach the published site.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'claude/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let an in-flight deploy finish rather than cancelling it: a half-applied
+# Pages deployment is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No dependencies and no lockfile, so there is nothing to install.
+      - name: Run tests
+        run: npm test
+
+      - name: Build the site
+        run: node web/build.js
+
+      - name: Check the built page is a complete document
+        run: |
+          test -f site/index.html
+          head -c 15 site/index.html | grep -q '<!doctype html>'
+          if grep -q '__MODEL_SOURCE__' site/index.html; then
+            echo "build placeholder was not substituted" >&2
+            exit 1
+          fi
+          echo "site/index.html looks well-formed"
+
+      # enablement turns Pages on via the API if it is not already, so the
+      # first run does not need anyone to visit repository settings.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

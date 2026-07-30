@@ -1,3 +1,7 @@
 node_modules/
 *.log
 .DS_Store
+
+# Built by web/build.js and published by CI. web/index.html is committed
+# because it is the artifact-host fragment; site/ is pure build output.
+site/
