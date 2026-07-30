@@ -75,6 +75,25 @@ browser, rather than replaying a precomputed table — so any cell on the page i
 reproducible from the command line. (Spot check: Germany / Administrative &
 clerical / Entry / 2030 reads −38.2% in both.)
 
+## Deployment
+
+The web app deploys to GitHub Pages from `.github/workflows/deploy.yml` on every
+push to the default branch. The job runs the test suite first and only deploys if
+it is green, so a parameter change that breaks the calibration fit to observed
+payroll data cannot reach the published site.
+
+**One manual step is required before the first deploy succeeds.** GitHub will not
+let a workflow create the Pages site for a repository — the API answers `Resource
+not accessible by integration` — so Pages has to be switched on by a repo admin:
+
+> **Settings → Pages → Build and deployment → Source: _GitHub Actions_**
+
+Then re-run the workflow (Actions → Deploy web app → Re-run jobs), or push
+anything. Until that is done the run fails at `configure-pages` with
+`Get Pages site failed … Not Found`, which is what that error means.
+
+The site publishes at `https://sivarajh.github.io/ai_job_predictor/`.
+
 ## How the model works
 
 For each cell and year:
