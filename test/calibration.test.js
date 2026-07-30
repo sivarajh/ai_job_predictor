@@ -22,8 +22,10 @@ const jurisdiction = JURISDICTIONS.find((j) => j.name === TARGETS.jurisdiction);
 const occupations = TARGETS.occupations.map((name) => OCCUPATIONS.find((o) => o.name === name));
 const level = (name) => EXPERIENCE_LEVELS.find((l) => l.name === name);
 
-function meanNetChange(levelName) {
-  const values = occupations.map((o) => netChange(o, level(levelName), jurisdiction, TARGETS.year));
+function meanNetChange(levelName, options = {}) {
+  const values = occupations.map((o) =>
+    netChange(o, level(levelName), jurisdiction, TARGETS.year, options),
+  );
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
@@ -48,6 +50,19 @@ test('experienced workers stay approximately stable', () => {
   assert.ok(
     actual >= min && actual <= max,
     `mid-level ${TARGETS.year} change ${(actual * 100).toFixed(1)}% outside observed band ` +
+      `${(min * 100).toFixed(0)}%..${(max * 100).toFixed(0)}%`,
+  );
+});
+
+test('the target holds on the age axis the paper actually measured', () => {
+  // The published finding is about workers aged 22-25. Before age bands
+  // existed this could only be proxied through the Entry experience level;
+  // now it can be checked directly, and both readings must land in the band.
+  const actual = meanNetChange('Entry', { ageBand: TARGETS.ageBand });
+  const { min, max } = TARGETS.ageBandHeadcountChange;
+  assert.ok(
+    actual >= min && actual <= max,
+    `${TARGETS.ageBand} at entry level: ${(actual * 100).toFixed(1)}% outside observed band ` +
       `${(min * 100).toFixed(0)}%..${(max * 100).toFixed(0)}%`,
   );
 });

@@ -4,18 +4,24 @@
  *
  *   node src/cli.js                                   headline tables
  *   node src/cli.js --scenario fast                   faster deployment
- *   node src/cli.js --jurisdiction "Germany" --detail  one market, by job type
+ *   node src/cli.js --industry "Public sector"        one sector's timing
+ *   node src/cli.js --age 55+                         one age band's recovery
+ *   node src/cli.js --jurisdiction Germany --detail   one market, by job type
  *   node src/cli.js --csv outputs/projections.csv     full grid
  *   node src/cli.js --hiring                          openings, not headcount
+ *   node src/cli.js --list                            valid industries and bands
  */
 
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { project } from './model.js';
-import { matrixTable, meanBy, toCsv } from './report.js';
+import { matrixTable, meanBy, toCsv, yearLabel } from './report.js';
 import {
+  AGE_BANDS,
   EXPERIENCE_LEVELS,
+  EXTRAPOLATION_FROM,
+  INDUSTRIES,
   JURISDICTIONS,
   OCCUPATIONS,
   PROJECTION_YEARS,
@@ -25,6 +31,7 @@ import {
 const EXPERIENCE_ORDER = EXPERIENCE_LEVELS.map((l) => l.name);
 const JURISDICTION_ORDER = JURISDICTIONS.map((j) => j.name);
 const OCCUPATION_ORDER = OCCUPATIONS.map((o) => o.name);
+const YEAR_LABELS = PROJECTION_YEARS.map((y) => yearLabel(y, EXTRAPOLATION_FROM));
 
 function parseArgs(argv) {
   const args = { scenario: 'central', detail: false, hiring: false };
@@ -32,6 +39,7 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === '--detail') args.detail = true;
     else if (arg === '--hiring') args.hiring = true;
+    else if (arg === '--list') args.list = true;
     else if (arg === '--help' || arg === '-h') args.help = true;
     else if (arg.startsWith('--')) args[arg.slice(2)] = argv[++i];
     else throw new Error(`unexpected argument: ${arg}`);
@@ -39,14 +47,29 @@ function parseArgs(argv) {
   return args;
 }
 
-const USAGE = `ai_job_predictor - AI employment impact scenarios, 2026-2030
+const USAGE = `ai_job_predictor - AI employment impact scenarios, ${PROJECTION_YEARS[0]}-${
+  PROJECTION_YEARS[PROJECTION_YEARS.length - 1]
+}
 
   --scenario <${Object.keys(SCENARIOS).join('|')}>   deployment speed (default: central)
+  --industry <name>                  sector lens (default: all industries)
+  --age <band>                       age band lens (default: all ages)
   --jurisdiction <name>              restrict to one market
   --occupation <name>                restrict to one job type
   --detail                           add job-type breakdowns
   --hiring                           report openings instead of headcount
   --csv <path>                       write the full grid to CSV
+  --list                             show valid industry and age band names
+
+† marks years from ${EXTRAPOLATION_FROM} on, which are extrapolation: past the
+  last observation the model is only checking itself.
+`;
+
+const LISTING = `Industries:
+${INDUSTRIES.map((i) => `  ${i.name}`).join('\n')}
+
+Age bands:
+${AGE_BANDS.map((a) => `  ${a.name}`).join('\n')}
 `;
 
 export function main(argv = process.argv.slice(2)) {
@@ -55,8 +78,20 @@ export function main(argv = process.argv.slice(2)) {
     process.stdout.write(USAGE);
     return 0;
   }
+  if (args.list) {
+    process.stdout.write(LISTING);
+    return 0;
+  }
 
-  const rows = project({ scenario: args.scenario });
+  let rows;
+  try {
+    rows = project({ scenario: args.scenario, industry: args.industry, ageBand: args.age });
+  } catch (error) {
+    // An unknown industry or age band is a typo, not a crash - name the
+    // valid values rather than making the user go and read the source.
+    console.error(`${error.message}\n\n${LISTING}`);
+    return 1;
+  }
 
   if (args.csv) {
     mkdirSync(dirname(args.csv), { recursive: true });
@@ -65,7 +100,7 @@ export function main(argv = process.argv.slice(2)) {
   }
 
   let subset = rows;
-  let heading = `scenario: ${args.scenario}`;
+  let heading = `scenario: ${args.scenario} | industry: ${rows[0].industry} | age: ${rows[0].ageBand}`;
   if (args.jurisdiction) {
     subset = subset.filter((r) => r.jurisdiction === args.jurisdiction);
     heading += ` | jurisdiction: ${args.jurisdiction}`;
@@ -92,9 +127,9 @@ export function main(argv = process.argv.slice(2)) {
   console.log(
     matrixTable(subset, {
       rowKey: (r) => r.experience,
-      colKey: (r) => r.year,
+      colKey: (r) => yearLabel(r.year, EXTRAPOLATION_FROM),
       rowOrder: EXPERIENCE_ORDER,
-      colOrder: [...PROJECTION_YEARS],
+      colOrder: YEAR_LABELS,
       label: 'Experience',
       value,
     }),
@@ -104,9 +139,9 @@ export function main(argv = process.argv.slice(2)) {
   console.log(
     matrixTable(subset, {
       rowKey: (r) => r.jurisdiction,
-      colKey: (r) => r.year,
+      colKey: (r) => yearLabel(r.year, EXTRAPOLATION_FROM),
       rowOrder: present(JURISDICTION_ORDER, 'jurisdiction'),
-      colOrder: [...PROJECTION_YEARS],
+      colOrder: YEAR_LABELS,
       label: 'Jurisdiction',
       value,
     }),
@@ -133,9 +168,9 @@ export function main(argv = process.argv.slice(2)) {
     console.log(
       matrixTable(subset, {
         rowKey: (r) => r.occupation,
-        colKey: (r) => r.year,
+        colKey: (r) => yearLabel(r.year, EXTRAPOLATION_FROM),
         rowOrder: present(OCCUPATION_ORDER, 'occupation'),
-        colOrder: [...PROJECTION_YEARS],
+        colOrder: YEAR_LABELS,
         label: 'Job type',
         value,
       }),

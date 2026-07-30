@@ -193,6 +193,90 @@ export const JURISDICTIONS = [
   { name: 'Nigeria', code: 'NG', aipi: 0.35, eprc: 1.5, capacity: 0.61, adoptionMidpoint: 2029.6, adoptionSteepness: 0.65, epl: 0.25, dynamism: 0.80, demographicPressure: 1.20 },
 ];
 
+// --------------------------------------------------------------------------
+// Industries
+// --------------------------------------------------------------------------
+//
+// The same job in different sectors is not the same job: a bank's software
+// engineers sit behind model-risk governance and change-control boards that
+// a startup's do not. Industry is a *modifier* rather than a stored grid
+// dimension - as a dimension it would multiply the exported grid by eleven
+// and fill it with combinations nobody asked for (nursing in construction).
+//
+// Three levers, deliberately separate because they act on different parts of
+// the model:
+//
+//   adoptionShift      years earlier (negative) or later that the sector
+//                      reaches half of its deployment - how fast it moves.
+//   regulatoryCeiling  multiplier on deployment capacity - how much of the
+//                      automatable work is ever *permitted*, however willing
+//                      the employer. Distinct from speed: a hospital that
+//                      moves fast still cannot automate a diagnosis sign-off.
+//   demandTrend        multiplier on job creation - whether the sector is
+//                      growing or shrinking for reasons unrelated to AI.
+//
+// All three are ESTIMATE. They are directionally well supported (public
+// sector procurement is slow, healthcare and finance are heavily supervised,
+// media is contracting) but no published index gives sector-level AI
+// deployment rates, so the magnitudes are judgement.
+
+export const INDUSTRIES = [
+  // The default. Neutral on every lever, so omitting an industry reproduces
+  // the cross-sector average exactly.
+  { name: 'All industries (baseline)', adoptionShift: 0.0, regulatoryCeiling: 1.0, demandTrend: 1.0 },
+
+  { name: 'Technology', adoptionShift: -1.2, regulatoryCeiling: 1.0, demandTrend: 1.25 },
+  { name: 'Media', adoptionShift: -0.6, regulatoryCeiling: 1.0, demandTrend: 0.85 },
+  { name: 'Professional services', adoptionShift: -0.4, regulatoryCeiling: 0.97, demandTrend: 1.05 },
+  { name: 'Retail & e-commerce', adoptionShift: -0.2, regulatoryCeiling: 0.98, demandTrend: 0.95 },
+  // Capital-rich and motivated, but model-risk governance caps how far it
+  // goes - fast to pilot, slow to put anything on the critical path.
+  { name: 'Financial services', adoptionShift: 0.6, regulatoryCeiling: 0.88, demandTrend: 1.0 },
+  { name: 'Manufacturing', adoptionShift: 0.8, regulatoryCeiling: 0.95, demandTrend: 0.95 },
+  { name: 'Energy & utilities', adoptionShift: 1.0, regulatoryCeiling: 0.9, demandTrend: 1.1 },
+  { name: 'Healthcare', adoptionShift: 1.5, regulatoryCeiling: 0.82, demandTrend: 1.2 },
+  { name: 'Education', adoptionShift: 1.6, regulatoryCeiling: 0.88, demandTrend: 1.0 },
+  // Procurement cycles, public accountability and the slowest replacement of
+  // legacy systems of any sector here.
+  { name: 'Public sector', adoptionShift: 2.0, regulatoryCeiling: 0.85, demandTrend: 0.9 },
+];
+
+// --------------------------------------------------------------------------
+// Age bands
+// --------------------------------------------------------------------------
+//
+// Age and experience correlate but are not the same axis: a 50-year-old
+// career changer is an entry-level worker, and a 30-year-old can be a
+// senior one. Experience determines how much of the work AI takes and how
+// fast headcount adjusts; age determines what happens to the worker
+// *afterwards*.
+//
+// IMPORTANT - these carry markedly weaker evidence than the experience
+// gradient, which is fitted to ADP payroll microdata. Displaced-worker
+// re-employment falling with age is a robust and long-standing finding, but
+// the specific multipliers here are ESTIMATE and are not calibrated against
+// any AI-era dataset. Read the age lens as a plausible overlay; read the
+// experience lens as a fitted result. They are not equally grounded, and
+// the README and the web app both say so.
+//
+//   reinstatementMultiplier  share of newly created work this band captures,
+//                            combining re-employment odds and retraining
+//                            uptake after displacement.
+//   hiringMultiplier         applied to the openings channel only - age bias
+//                            bites when applying, not when already employed.
+
+export const AGE_BANDS = [
+  // The default: no age assumption layered on top of experience.
+  { name: 'All ages', reinstatementMultiplier: 1.0, hiringMultiplier: 1.0 },
+
+  // The cohort the Stanford/ADP result is measured on.
+  { name: '22-25', reinstatementMultiplier: 1.1, hiringMultiplier: 1.0 },
+  { name: '26-34', reinstatementMultiplier: 1.1, hiringMultiplier: 1.0 },
+  { name: '35-44', reinstatementMultiplier: 1.0, hiringMultiplier: 0.97 },
+  { name: '45-54', reinstatementMultiplier: 0.85, hiringMultiplier: 0.9 },
+  { name: '55+', reinstatementMultiplier: 0.65, hiringMultiplier: 0.8 },
+];
+
 /**
  * Employment protection slows adjustment but never blocks it: even the
  * strictest regime still adjusts at 25% of the speed of an at-will one,
@@ -229,7 +313,21 @@ export const MAX_AUTOMATABLE_SHARE = 0.95;
 /** Baseline year: the counterfactual and the actual coincide here. */
 export const BASE_YEAR = 2025;
 
-export const PROJECTION_YEARS = [2026, 2027, 2028, 2029, 2030];
+export const PROJECTION_YEARS = [
+  2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036,
+];
+
+/**
+ * The year from which output is extrapolation rather than projection.
+ *
+ * The ADP microdata the experience gradient is fitted to runs to April 2026.
+ * A diffusion curve can be defended a couple of years past its last
+ * observation; it cannot be defended a decade past. Everything from this
+ * year on is the model's internal logic running forward with nothing to
+ * check it against, and the CLI, the tables and the charts all mark it as
+ * such rather than letting a 2036 figure be read like a 2027 one.
+ */
+export const EXTRAPOLATION_FROM = 2029;
 
 /**
  * Scenario multipliers. These shift the deployment curve earlier or later
@@ -250,6 +348,11 @@ export const SCENARIOS = {
  * The paper's "most AI-exposed occupations" are represented here by the
  * occupations it studies directly - software development and customer
  * support - in the United States, at the entry level, by 2026.
+ *
+ * The paper's finding is stated in *age* terms (22-25). Before age bands
+ * existed the model could only proxy that through the Entry experience
+ * level; now it is checked both ways - through the experience proxy at
+ * baseline age, and against the 22-25 band directly.
  */
 export const CALIBRATION_TARGETS = {
   jurisdiction: 'United States',
@@ -259,4 +362,7 @@ export const CALIBRATION_TARGETS = {
   entryHeadcountChange: { min: -0.19, max: -0.13 },
   /** Employment for experienced workers "remained stable". */
   midHeadcountChange: { min: -0.04, max: 0.02 },
+  /** The same target expressed on the age axis the paper actually used. */
+  ageBand: '22-25',
+  ageBandHeadcountChange: { min: -0.19, max: -0.13 },
 };

@@ -1,8 +1,8 @@
 # ai_job_predictor
 
-A scenario model of how AI changes employment, resolved across four dimensions at
-once: **job type × experience level × jurisdiction × year**, progressively from
-2026 to 2030.
+A scenario model of how AI changes employment, resolved across **job type ×
+experience level × jurisdiction × year**, from 2026 to 2036, with **industry** and
+**age band** available as lenses over the result.
 
 Every number is employment measured against a **no-AI counterfactual** — how many
 more or fewer people are doing a job than would have been, absent AI. It is not a
@@ -20,11 +20,14 @@ No dependencies, no install. Node 20+.
 ```bash
 node src/cli.js                                     # headline tables
 node src/cli.js --scenario fast                     # faster deployment
+node src/cli.js --industry "Public sector"          # one sector's timing
+node src/cli.js --age 55+                           # one age band's recovery
 node src/cli.js --jurisdiction Germany --detail     # one market, by job type
 node src/cli.js --occupation "Software engineering" # one job type, all markets
 node src/cli.js --hiring                            # openings instead of headcount
-node src/cli.js --csv outputs/projections.csv       # full 6,300-row grid
-npm test                                            # 23 tests, node:test
+node src/cli.js --list                              # valid industries and age bands
+node src/cli.js --csv outputs/projections.csv       # full 13,860-row grid
+npm test                                            # 41 tests, node:test
 node web/build.js                                   # rebuild the web app
 ```
 
@@ -32,16 +35,36 @@ node web/build.js                                   # rebuild the web app
 
 At the central deployment speed, averaged over all job types and markets:
 
-| Experience | 2026 | 2027 | 2028 | 2029 | 2030 |
+| Experience | 2026 | 2028 | 2030† | 2033† | 2036† |
 |---|---|---|---|---|---|
-| Entry (0–2 yrs) | −5.7% | −9.8% | −14.5% | −18.6% | −21.4% |
-| Junior (2–5 yrs) | −2.8% | −4.8% | −6.9% | −8.7% | −9.8% |
-| Mid (5–10 yrs) | −0.9% | −1.4% | −1.8% | −2.0% | −1.9% |
-| Senior (10–20 yrs) | −0.3% | −0.4% | −0.3% | −0.1% | +0.2% |
-| Lead / Executive | −0.0% | −0.0% | +0.1% | +0.4% | +0.7% |
+| Entry (0–2 yrs) | −5.7% | −14.5% | −21.4% | −24.6% | −25.1% |
+| Junior (2–5 yrs) | −2.8% | −6.9% | −9.8% | −10.7% | −10.9% |
+| Mid (5–10 yrs) | −0.9% | −1.8% | −1.9% | −1.4% | −1.3% |
+| Senior (10–20 yrs) | −0.3% | −0.3% | +0.2% | +0.9% | +1.0% |
+| Lead / Executive (20+) | −0.0% | +0.1% | +0.7% | +1.4% | +1.5% |
+
+† extrapolated — see the horizon caveat below.
 
 The spread between the top and bottom rows is the finding. It is the same
 technology in the same markets; what differs is career stage.
+
+Note where the curves flatten. Most of the damage is done by 2030; the following
+six years mostly re-run the same logic against a saturating deployment curve. A
+model like this has more to say about **when** and **who** than about 2036.
+
+Industry changes the timing far more than the destination. Entry-level clerical
+work in the US:
+
+| Sector | 2027 | 2030† | 2036† |
+|---|---|---|---|
+| Technology | −52.3% | −65.4% | −66.7% |
+| Financial services | −25.4% | −54.0% | −59.4% |
+| Healthcare | −14.1% | −45.2% | −54.8% |
+| Public sector | −10.5% | −43.1% | −57.5% |
+
+A five-fold gap in 2027 closes to well under two-fold by 2036. Slow institutions
+buy years, not immunity — which is the single most useful thing here for anyone
+planning a workforce.
 
 Three things drive it:
 
@@ -110,6 +133,32 @@ For each cell and year:
 
 `net = reinstatement − displacement`.
 
+### Industry and age are lenses, not extra grid dimensions
+
+Both were deliberately built as **modifier layers over a neutral baseline** rather
+than stored dimensions. As dimensions they would take the grid from 6,300 rows to
+831,600, put a ~15MB CSV in the repo, and fill it with combinations nobody asked
+for (nursing in construction, 22-25 Lead/Executive). As modifiers, every
+combination stays reachable from the CLI and the web app while the exported grid
+stays small.
+
+The guarantee that makes this legitimate is tested: with the baseline industry and
+baseline age selected, the model reproduces the pre-existing numbers **exactly**
+(`test/baseline.test.js`, against a fixture captured before either existed).
+
+**Industry** moves two things independently — how fast a sector gets there
+(`adoptionShift`) and how far it is ever allowed to go (`regulatoryCeiling`).
+Keeping them separate matters: a hospital can be an eager adopter and still be
+barred from automating a sign-off. Sector demand growth is a third, separate lever
+on job creation.
+
+**Age** acts only on what happens *after* displacement. How much of a role AI takes,
+and how fast an employer can act on it, depend on the job and the jurisdiction, not
+on the birthday of whoever holds it — so age moves recovery and hiring, never
+displacement. It is an amplifier rather than a level shift, because age bias in
+hiring exists in the no-AI counterfactual too and this model reports only the
+difference from it.
+
 Reinstatement is deliberately **not** a function of employment protection. The
 productivity gain exists once the automation runs, whether or not the employer was
 legally able to act on it — gating job creation on dismissal law would wrongly make
@@ -136,6 +185,11 @@ The parameters are set so the model reproduces that result — it returns −16.
 entry-level staff and −2.3% for mid-career staff in US software engineering and
 customer support in 2026. `test/calibration.test.js` asserts the fit still holds, so
 a parameter edit cannot silently break it.
+
+The published finding is stated in *age* terms (22–25). Before age bands existed
+the model could only proxy that through the Entry experience level; it is now
+checked both ways — through the experience proxy at baseline age, and against the
+22–25 band directly.
 
 ## Sources
 
@@ -171,6 +225,17 @@ EPRC score at all and are estimated from labour-law characteristics.
   recovers. Treat any conclusion that flips between those two as unsupported.
 - **Weighted.** Aggregates are unweighted — every job type counts once — so they mean
   "the average job type", not "this country's labour force".
-- **Grounded past ~2028.** Diffusion curves beyond that are extrapolation with no
-  observational support. The ordering of cells is more trustworthy than the
-  magnitudes, and the magnitudes more trustworthy than any single number.
+- **Equally confident across its two lenses.** The experience gradient is *fitted* to
+  payroll microdata. The age multipliers are estimates: that re-employment after
+  displacement falls with age is a robust, long-standing finding, but the specific
+  numbers here are not calibrated against any AI-era dataset. Trust the shape of the
+  age result well before its size. The industry parameters are estimates too —
+  directionally well supported, but no published index gives sector-level AI
+  deployment rates.
+- **Grounded past 2028.** Everything from 2029 on is extrapolation, marked `†` in the
+  CLI and shaded in the web app. The payroll data the model is fitted to runs to
+  April 2026; a diffusion curve can be defended a couple of years past its last
+  observation, not a decade. The later years are the model's internal logic running
+  forward with nothing to check it against. The ordering of cells is more trustworthy
+  than the magnitudes, and the magnitudes more trustworthy than any single number —
+  and that applies far more harshly after 2030 than before it.

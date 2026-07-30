@@ -390,8 +390,8 @@
 
 <div class="wrap">
   <header class="masthead">
-    <span class="eyebrow">Scenario model &middot; 2026&ndash;2030</span>
-    <h1>What AI does to jobs, by experience level and jurisdiction</h1>
+    <span class="eyebrow">Scenario model &middot; 2026&ndash;2036</span>
+    <h1>What AI does to jobs, by experience, industry, age and jurisdiction</h1>
     <p class="standfirst">
       Every number here is employment measured against a <strong>no-AI counterfactual</strong> &mdash; how
       many more or fewer people are doing this job than would have been, absent AI. It is not a forecast of
@@ -406,8 +406,16 @@
       <select id="f-occupation"></select>
     </label>
     <label class="field">
+      <span>Industry</span>
+      <select id="f-industry"></select>
+    </label>
+    <label class="field">
       <span>Jurisdiction</span>
       <select id="f-jurisdiction"></select>
+    </label>
+    <label class="field">
+      <span>Age band</span>
+      <select id="f-age"></select>
     </label>
     <label class="field">
       <span>Year</span>
@@ -497,6 +505,21 @@
       tier beside a stable experienced one.
     </p>
 
+    <h3>Industry and age are lenses over that, not extra grid dimensions</h3>
+    <p>
+      <strong>Industry</strong> moves two things independently: how fast a sector gets there, and how far
+      it is ever allowed to go. Keeping them apart matters &mdash; a hospital can be an eager adopter and
+      still be barred from automating a diagnosis sign-off. Sector demand growth is a third, separate
+      lever on job creation.
+    </p>
+    <p>
+      <strong>Age</strong> acts only on what happens to a worker <em>after</em> displacement. How much of a
+      role AI takes, and how quickly an employer can act on it, depend on the job and the jurisdiction
+      &mdash; not on the birthday of whoever currently holds it. So age changes recovery and hiring, never
+      displacement. It is written as an amplifier rather than a level shift, because age bias in hiring
+      exists in the no-AI counterfactual too, and this model measures only the difference from it.
+    </p>
+
     <h3>Calibration</h3>
     <p>
       The experience gradient is fitted, not assumed. Brynjolfsson, Chandar &amp; Chen measured a ~16%
@@ -534,9 +557,19 @@
         positive by 2030; assume a small one and almost nothing recovers.
       </p>
       <p>
-        <strong>Beyond about 2028 there is no observational support</strong> &mdash; the diffusion curves are
-        extrapolation. Treat the ordering of cells as more trustworthy than the magnitudes, and the
-        magnitudes as more trustworthy than any single number.
+        <strong>The age lens is weaker evidence than the experience lens.</strong> The experience gradient
+        is <em>fitted</em> to payroll microdata. The age multipliers are estimates &mdash; that
+        re-employment after displacement falls with age is a robust, long-standing finding, but the
+        specific numbers here are not calibrated against any AI-era dataset. The two lenses are not
+        equally grounded, and the shape of the age result should be trusted well before its size.
+      </p>
+      <p>
+        <strong>Everything from 2029 on is extrapolation</strong> &mdash; the shaded region above. The
+        payroll data the model is fitted to runs to April 2026. A diffusion curve can be defended a couple
+        of years past its last observation; it cannot be defended a decade past. The later years are the
+        model's internal logic running forward with nothing to check it against. Treat the ordering of
+        cells as more trustworthy than the magnitudes, and the magnitudes as more trustworthy than any
+        single number &mdash; and apply that far more harshly after 2030 than before it.
       </p>
     </div>
   </section>
@@ -564,6 +597,8 @@ const POS_STEPS = ['--pos-1', '--pos-2', '--pos-3', '--pos-4', '--pos-5'];
 const state = {
   occupation: 'Software engineering',
   jurisdiction: 'United States',
+  industry: INDUSTRIES[0].name,
+  ageBand: AGE_BANDS[0].name,
   year: 2030,
   scenario: 'central',
   measure: 'netChange',
@@ -585,18 +620,20 @@ function measureLabel() {
   return state.measure === 'netChange' ? 'headcount' : 'annual openings';
 }
 
-function rowsFor(filter = {}) {
-  return project({ scenario: state.scenario }).filter((r) =>
-    Object.entries(filter).every(([k, v]) => r[k] === v),
-  );
-}
-
-let cachedScenario = null;
+// The grid is recomputed whenever the scenario, industry or age band change,
+// and cached in between — those three are the only inputs the model itself
+// depends on. Everything else is filtering over the result.
+let cacheKey = null;
 let cachedRows = null;
 function allRows() {
-  if (cachedScenario !== state.scenario) {
-    cachedRows = project({ scenario: state.scenario });
-    cachedScenario = state.scenario;
+  const key = `${state.scenario}|${state.industry}|${state.ageBand}`;
+  if (cacheKey !== key) {
+    cachedRows = project({
+      scenario: state.scenario,
+      industry: state.industry,
+      ageBand: state.ageBand,
+    });
+    cacheKey = key;
   }
   return cachedRows;
 }
@@ -693,6 +730,30 @@ function renderTrajectory() {
     'aria-label': `Projected change in ${measureLabel()} for ${state.occupation} in ${state.jurisdiction}, by experience level, 2026 to 2030`,
   });
 
+  // The extrapolation region, drawn first so everything else sits on top of
+  // it. Past the last observation the model is only checking itself, and the
+  // chart should say so rather than letting 2036 look like 2027.
+  const boundary = x(EXTRAPOLATION_FROM - 0.5);
+  svg.append(
+    el('rect', {
+      x: boundary, y: m.top,
+      width: width - m.right - boundary, height: height - m.top - m.bottom,
+      fill: cssVar('--grid'), opacity: 0.4,
+    }),
+  );
+  svg.append(
+    el('line', {
+      x1: boundary, x2: boundary, y1: m.top, y2: height - m.bottom,
+      stroke: cssVar('--axis'), 'stroke-width': 1,
+    }),
+  );
+  svg.append(
+    el('text', {
+      x: boundary + 7, y: m.top + 13,
+      fill: cssVar('--muted'), 'font-size': 10,
+    }, 'extrapolation — no observational support'),
+  );
+
   // gridlines: solid hairlines, one shade off the surface
   const ticks = 6;
   for (let i = 0; i <= ticks; i += 1) {
@@ -724,14 +785,17 @@ function renderTrajectory() {
     }, 'no-AI baseline'),
   );
 
-  for (const year of years) {
+  // Eleven year labels will not fit legibly, so label alternate years and
+  // let the hover bands carry the rest.
+  years.forEach((year, i) => {
+    if (i % 2 !== 0 && i !== years.length - 1) return;
     svg.append(
       el('text', {
         x: x(year), y: height - m.bottom + 20, 'text-anchor': 'middle',
         fill: cssVar('--muted'), 'font-size': 11,
       }, String(year)),
     );
-  }
+  });
 
   for (const s of series) {
     const d = s.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.year)},${y(p.value)}`).join(' ');
@@ -797,7 +861,8 @@ function renderTrajectory() {
           return `<div><span style="color:${s.color}">●</span> ${s.name} &nbsp;${fmtPct(p.value)}</div>`;
         })
         .join('');
-      showTip(event, `<strong>${year} &middot; ${measureLabel()}</strong>${lines}`);
+      const flag = year >= EXTRAPOLATION_FROM ? ' &middot; extrapolated' : '';
+      showTip(event, `<strong>${year} &middot; ${measureLabel()}${flag}</strong>${lines}`);
     });
     band.addEventListener('mouseleave', hideTip);
     svg.append(band);
@@ -828,8 +893,10 @@ function renderTrajectory() {
       : 'The gap between the top and bottom lines is the story: the same technology, the same market, a different career stage.');
 
   buildTable('traj-table', {
-    caption: `Change in ${measureLabel()}, ${state.occupation}, ${state.jurisdiction}`,
-    columns: ['Experience level', ...years.map(String)],
+    caption:
+      `Change in ${measureLabel()}, ${state.occupation}, ${state.jurisdiction}. ` +
+      `† marks extrapolated years, from ${EXTRAPOLATION_FROM} on.`,
+    columns: ['Experience level', ...years.map((y) => yearLabel(y, EXTRAPOLATION_FROM))],
     rows: series.map((s) => [s.name, ...s.points.map((p) => fmtPct(p.value))]),
   });
 }
@@ -1179,9 +1246,22 @@ function renderAll() {
 
 function init() {
   fillSelect($('f-occupation'), OCCUPATIONS.map((o) => o.name), state.occupation);
+  fillSelect($('f-industry'), INDUSTRIES.map((i) => i.name), state.industry);
   fillSelect($('f-jurisdiction'), JURISDICTIONS.map((j) => j.name), state.jurisdiction);
-  fillSelect($('f-year'), PROJECTION_YEARS.map(String), String(state.year));
+  fillSelect($('f-age'), AGE_BANDS.map((a) => a.name), state.ageBand);
   fillSelect($('f-scenario'), Object.keys(SCENARIOS), state.scenario);
+
+  // Year options keep the dagger so the extrapolation warning survives even
+  // when the reader is looking at a single-year view.
+  const yearSelect = $('f-year');
+  yearSelect.replaceChildren();
+  for (const year of PROJECTION_YEARS) {
+    const option = document.createElement('option');
+    option.value = String(year);
+    option.textContent = yearLabel(year, EXTRAPOLATION_FROM);
+    if (year === state.year) option.selected = true;
+    yearSelect.append(option);
+  }
 
   // The ranking chart needs its own level selector; it lives in the same
   // filter row rather than inside the card.
@@ -1197,7 +1277,9 @@ function init() {
   select.addEventListener('change', renderRanking);
 
   $('f-occupation').addEventListener('change', (e) => { state.occupation = e.target.value; renderAll(); });
+  $('f-industry').addEventListener('change', (e) => { state.industry = e.target.value; renderAll(); });
   $('f-jurisdiction').addEventListener('change', (e) => { state.jurisdiction = e.target.value; renderAll(); });
+  $('f-age').addEventListener('change', (e) => { state.ageBand = e.target.value; renderAll(); });
   $('f-year').addEventListener('change', (e) => { state.year = Number(e.target.value); renderAll(); });
   $('f-scenario').addEventListener('change', (e) => { state.scenario = e.target.value; renderAll(); });
   $('f-measure').addEventListener('change', (e) => { state.measure = e.target.value; renderAll(); });

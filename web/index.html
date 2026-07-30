@@ -390,8 +390,8 @@
 
 <div class="wrap">
   <header class="masthead">
-    <span class="eyebrow">Scenario model &middot; 2026&ndash;2030</span>
-    <h1>What AI does to jobs, by experience level and jurisdiction</h1>
+    <span class="eyebrow">Scenario model &middot; 2026&ndash;2036</span>
+    <h1>What AI does to jobs, by experience, industry, age and jurisdiction</h1>
     <p class="standfirst">
       Every number here is employment measured against a <strong>no-AI counterfactual</strong> &mdash; how
       many more or fewer people are doing this job than would have been, absent AI. It is not a forecast of
@@ -406,8 +406,16 @@
       <select id="f-occupation"></select>
     </label>
     <label class="field">
+      <span>Industry</span>
+      <select id="f-industry"></select>
+    </label>
+    <label class="field">
       <span>Jurisdiction</span>
       <select id="f-jurisdiction"></select>
+    </label>
+    <label class="field">
+      <span>Age band</span>
+      <select id="f-age"></select>
     </label>
     <label class="field">
       <span>Year</span>
@@ -497,6 +505,21 @@
       tier beside a stable experienced one.
     </p>
 
+    <h3>Industry and age are lenses over that, not extra grid dimensions</h3>
+    <p>
+      <strong>Industry</strong> moves two things independently: how fast a sector gets there, and how far
+      it is ever allowed to go. Keeping them apart matters &mdash; a hospital can be an eager adopter and
+      still be barred from automating a diagnosis sign-off. Sector demand growth is a third, separate
+      lever on job creation.
+    </p>
+    <p>
+      <strong>Age</strong> acts only on what happens to a worker <em>after</em> displacement. How much of a
+      role AI takes, and how quickly an employer can act on it, depend on the job and the jurisdiction
+      &mdash; not on the birthday of whoever currently holds it. So age changes recovery and hiring, never
+      displacement. It is written as an amplifier rather than a level shift, because age bias in hiring
+      exists in the no-AI counterfactual too, and this model measures only the difference from it.
+    </p>
+
     <h3>Calibration</h3>
     <p>
       The experience gradient is fitted, not assumed. Brynjolfsson, Chandar &amp; Chen measured a ~16%
@@ -534,9 +557,19 @@
         positive by 2030; assume a small one and almost nothing recovers.
       </p>
       <p>
-        <strong>Beyond about 2028 there is no observational support</strong> &mdash; the diffusion curves are
-        extrapolation. Treat the ordering of cells as more trustworthy than the magnitudes, and the
-        magnitudes as more trustworthy than any single number.
+        <strong>The age lens is weaker evidence than the experience lens.</strong> The experience gradient
+        is <em>fitted</em> to payroll microdata. The age multipliers are estimates &mdash; that
+        re-employment after displacement falls with age is a robust, long-standing finding, but the
+        specific numbers here are not calibrated against any AI-era dataset. The two lenses are not
+        equally grounded, and the shape of the age result should be trusted well before its size.
+      </p>
+      <p>
+        <strong>Everything from 2029 on is extrapolation</strong> &mdash; the shaded region above. The
+        payroll data the model is fitted to runs to April 2026. A diffusion curve can be defended a couple
+        of years past its last observation; it cannot be defended a decade past. The later years are the
+        model's internal logic running forward with nothing to check it against. Treat the ordering of
+        cells as more trustworthy than the magnitudes, and the magnitudes as more trustworthy than any
+        single number &mdash; and apply that far more harshly after 2030 than before it.
       </p>
     </div>
   </section>
@@ -747,6 +780,90 @@ const JURISDICTIONS = [
   { name: 'Nigeria', code: 'NG', aipi: 0.35, eprc: 1.5, capacity: 0.61, adoptionMidpoint: 2029.6, adoptionSteepness: 0.65, epl: 0.25, dynamism: 0.80, demographicPressure: 1.20 },
 ];
 
+// --------------------------------------------------------------------------
+// Industries
+// --------------------------------------------------------------------------
+//
+// The same job in different sectors is not the same job: a bank's software
+// engineers sit behind model-risk governance and change-control boards that
+// a startup's do not. Industry is a *modifier* rather than a stored grid
+// dimension - as a dimension it would multiply the exported grid by eleven
+// and fill it with combinations nobody asked for (nursing in construction).
+//
+// Three levers, deliberately separate because they act on different parts of
+// the model:
+//
+//   adoptionShift      years earlier (negative) or later that the sector
+//                      reaches half of its deployment - how fast it moves.
+//   regulatoryCeiling  multiplier on deployment capacity - how much of the
+//                      automatable work is ever *permitted*, however willing
+//                      the employer. Distinct from speed: a hospital that
+//                      moves fast still cannot automate a diagnosis sign-off.
+//   demandTrend        multiplier on job creation - whether the sector is
+//                      growing or shrinking for reasons unrelated to AI.
+//
+// All three are ESTIMATE. They are directionally well supported (public
+// sector procurement is slow, healthcare and finance are heavily supervised,
+// media is contracting) but no published index gives sector-level AI
+// deployment rates, so the magnitudes are judgement.
+
+const INDUSTRIES = [
+  // The default. Neutral on every lever, so omitting an industry reproduces
+  // the cross-sector average exactly.
+  { name: 'All industries (baseline)', adoptionShift: 0.0, regulatoryCeiling: 1.0, demandTrend: 1.0 },
+
+  { name: 'Technology', adoptionShift: -1.2, regulatoryCeiling: 1.0, demandTrend: 1.25 },
+  { name: 'Media', adoptionShift: -0.6, regulatoryCeiling: 1.0, demandTrend: 0.85 },
+  { name: 'Professional services', adoptionShift: -0.4, regulatoryCeiling: 0.97, demandTrend: 1.05 },
+  { name: 'Retail & e-commerce', adoptionShift: -0.2, regulatoryCeiling: 0.98, demandTrend: 0.95 },
+  // Capital-rich and motivated, but model-risk governance caps how far it
+  // goes - fast to pilot, slow to put anything on the critical path.
+  { name: 'Financial services', adoptionShift: 0.6, regulatoryCeiling: 0.88, demandTrend: 1.0 },
+  { name: 'Manufacturing', adoptionShift: 0.8, regulatoryCeiling: 0.95, demandTrend: 0.95 },
+  { name: 'Energy & utilities', adoptionShift: 1.0, regulatoryCeiling: 0.9, demandTrend: 1.1 },
+  { name: 'Healthcare', adoptionShift: 1.5, regulatoryCeiling: 0.82, demandTrend: 1.2 },
+  { name: 'Education', adoptionShift: 1.6, regulatoryCeiling: 0.88, demandTrend: 1.0 },
+  // Procurement cycles, public accountability and the slowest replacement of
+  // legacy systems of any sector here.
+  { name: 'Public sector', adoptionShift: 2.0, regulatoryCeiling: 0.85, demandTrend: 0.9 },
+];
+
+// --------------------------------------------------------------------------
+// Age bands
+// --------------------------------------------------------------------------
+//
+// Age and experience correlate but are not the same axis: a 50-year-old
+// career changer is an entry-level worker, and a 30-year-old can be a
+// senior one. Experience determines how much of the work AI takes and how
+// fast headcount adjusts; age determines what happens to the worker
+// *afterwards*.
+//
+// IMPORTANT - these carry markedly weaker evidence than the experience
+// gradient, which is fitted to ADP payroll microdata. Displaced-worker
+// re-employment falling with age is a robust and long-standing finding, but
+// the specific multipliers here are ESTIMATE and are not calibrated against
+// any AI-era dataset. Read the age lens as a plausible overlay; read the
+// experience lens as a fitted result. They are not equally grounded, and
+// the README and the web app both say so.
+//
+//   reinstatementMultiplier  share of newly created work this band captures,
+//                            combining re-employment odds and retraining
+//                            uptake after displacement.
+//   hiringMultiplier         applied to the openings channel only - age bias
+//                            bites when applying, not when already employed.
+
+const AGE_BANDS = [
+  // The default: no age assumption layered on top of experience.
+  { name: 'All ages', reinstatementMultiplier: 1.0, hiringMultiplier: 1.0 },
+
+  // The cohort the Stanford/ADP result is measured on.
+  { name: '22-25', reinstatementMultiplier: 1.1, hiringMultiplier: 1.0 },
+  { name: '26-34', reinstatementMultiplier: 1.1, hiringMultiplier: 1.0 },
+  { name: '35-44', reinstatementMultiplier: 1.0, hiringMultiplier: 0.97 },
+  { name: '45-54', reinstatementMultiplier: 0.85, hiringMultiplier: 0.9 },
+  { name: '55+', reinstatementMultiplier: 0.65, hiringMultiplier: 0.8 },
+];
+
 /**
  * Employment protection slows adjustment but never blocks it: even the
  * strictest regime still adjusts at 25% of the speed of an at-will one,
@@ -783,7 +900,21 @@ const MAX_AUTOMATABLE_SHARE = 0.95;
 /** Baseline year: the counterfactual and the actual coincide here. */
 const BASE_YEAR = 2025;
 
-const PROJECTION_YEARS = [2026, 2027, 2028, 2029, 2030];
+const PROJECTION_YEARS = [
+  2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036,
+];
+
+/**
+ * The year from which output is extrapolation rather than projection.
+ *
+ * The ADP microdata the experience gradient is fitted to runs to April 2026.
+ * A diffusion curve can be defended a couple of years past its last
+ * observation; it cannot be defended a decade past. Everything from this
+ * year on is the model's internal logic running forward with nothing to
+ * check it against, and the CLI, the tables and the charts all mark it as
+ * such rather than letting a 2036 figure be read like a 2027 one.
+ */
+const EXTRAPOLATION_FROM = 2029;
 
 /**
  * Scenario multipliers. These shift the deployment curve earlier or later
@@ -804,6 +935,11 @@ const SCENARIOS = {
  * The paper's "most AI-exposed occupations" are represented here by the
  * occupations it studies directly - software development and customer
  * support - in the United States, at the entry level, by 2026.
+ *
+ * The paper's finding is stated in *age* terms (22-25). Before age bands
+ * existed the model could only proxy that through the Entry experience
+ * level; now it is checked both ways - through the experience proxy at
+ * baseline age, and against the 22-25 band directly.
  */
 const CALIBRATION_TARGETS = {
   jurisdiction: 'United States',
@@ -813,6 +949,9 @@ const CALIBRATION_TARGETS = {
   entryHeadcountChange: { min: -0.19, max: -0.13 },
   /** Employment for experienced workers "remained stable". */
   midHeadcountChange: { min: -0.04, max: 0.02 },
+  /** The same target expressed on the age axis the paper actually used. */
+  ageBand: '22-25',
+  ageBandHeadcountChange: { min: -0.19, max: -0.13 },
 };
 
 // ===== src/model.js =====
@@ -854,17 +993,55 @@ const CALIBRATION_TARGETS = {
  */
 
 
+const BASELINE_INDUSTRY = INDUSTRIES[0];
+const BASELINE_AGE_BAND = AGE_BANDS[0];
+
+/**
+ * Normalise the modifier bundle every model function takes.
+ *
+ * Industry and age arrive as names from the CLI and the web app, and as
+ * objects from internal callers. Both resolve here, and anything omitted
+ * falls back to the neutral baseline - which is what lets a call with no
+ * options reproduce the original cross-sector, all-ages numbers exactly.
+ */
+function resolveOptions(options = {}) {
+  const { scenario = 1, industry, ageBand } = options;
+
+  const resolved = {
+    scenario: typeof scenario === 'string' ? SCENARIOS[scenario] : scenario,
+    industry:
+      typeof industry === 'string'
+        ? INDUSTRIES.find((i) => i.name === industry)
+        : industry ?? BASELINE_INDUSTRY,
+    ageBand:
+      typeof ageBand === 'string'
+        ? AGE_BANDS.find((a) => a.name === ageBand)
+        : ageBand ?? BASELINE_AGE_BAND,
+  };
+
+  if (resolved.scenario === undefined) throw new Error(`unknown scenario ${scenario}`);
+  if (!resolved.industry) throw new Error(`unknown industry ${industry}`);
+  if (!resolved.ageBand) throw new Error(`unknown age band ${ageBand}`);
+  return resolved;
+}
+
 /**
  * Share of automatable work actually deployed against by `year`.
  *
  * Slow while systems are piloted, steep once they become procurement
  * standard, then a ceiling. A faster scenario pulls the midpoint earlier
  * rather than raising the ceiling implausibly.
+ *
+ * Industry moves two things independently: how fast the sector gets there
+ * (`adoptionShift`) and how far it is ever allowed to go
+ * (`regulatoryCeiling`). Keeping them separate matters - a hospital can be
+ * an eager adopter and still be barred from automating a sign-off.
  */
-function deploymentShare(jurisdiction, year, scenario = 1) {
-  const midpoint = jurisdiction.adoptionMidpoint - (scenario - 1) * 2;
+function deploymentShare(jurisdiction, year, options = {}) {
+  const { scenario, industry } = resolveOptions(options);
+  const midpoint = jurisdiction.adoptionMidpoint - (scenario - 1) * 2 + industry.adoptionShift;
   const raw = 1 / (1 + Math.exp(-jurisdiction.adoptionSteepness * (year - midpoint)));
-  return jurisdiction.capacity * raw;
+  return jurisdiction.capacity * industry.regulatoryCeiling * raw;
 }
 
 /** Share of this cell's tasks AI can perform outright. */
@@ -875,11 +1052,18 @@ function automatableShare(occupation, level) {
   );
 }
 
-/** Gross reduction in labour demand, as a share of baseline headcount. */
-function displacement(occupation, level, jurisdiction, year, scenario = 1) {
+/**
+ * Gross reduction in labour demand, as a share of baseline headcount.
+ *
+ * Age deliberately does not appear here. How much work AI takes, and how
+ * fast the employer can act on it, depend on the role and the jurisdiction -
+ * not on the birthday of whoever currently holds the job. Age acts on what
+ * happens to the worker afterwards, which is reinstatement and hiring.
+ */
+function displacement(occupation, level, jurisdiction, year, options = {}) {
   const friction = MAX_FRICTION * jurisdiction.epl;
   const passThrough = (1 - friction) * level.adjustmentSpeed;
-  const pressure = automatableShare(occupation, level) * deploymentShare(jurisdiction, year, scenario);
+  const pressure = automatableShare(occupation, level) * deploymentShare(jurisdiction, year, options);
   return pressure * passThrough * jurisdiction.demographicPressure;
 }
 
@@ -894,8 +1078,8 @@ function displacement(occupation, level, jurisdiction, year, scenario = 1) {
  * an earlier version of this model did, wrongly made strict-protection
  * markets look like they generate less new work.
  */
-function freedLabour(occupation, level, jurisdiction, year, scenario = 1) {
-  return automatableShare(occupation, level) * deploymentShare(jurisdiction, year, scenario);
+function freedLabour(occupation, level, jurisdiction, year, options = {}) {
+  return automatableShare(occupation, level) * deploymentShare(jurisdiction, year, options);
 }
 
 /**
@@ -903,19 +1087,33 @@ function freedLabour(occupation, level, jurisdiction, year, scenario = 1) {
  *
  * Lagged: cheaper output, and the new work that follows it, only arrive once
  * the automation has been running for a while.
+ *
+ * This is where both new modifiers land. Industry sets whether the sector is
+ * growing or shrinking around the AI effect; age sets how much of the new
+ * work this cohort actually captures, since re-employment after displacement
+ * falls with age.
  */
-function reinstatement(occupation, level, jurisdiction, year, scenario = 1) {
-  const freed = freedLabour(occupation, level, jurisdiction, year - REINSTATEMENT_LAG_YEARS, scenario);
+function reinstatement(occupation, level, jurisdiction, year, options = {}) {
+  const { industry, ageBand } = resolveOptions(options);
+  const freed = freedLabour(occupation, level, jurisdiction, year - REINSTATEMENT_LAG_YEARS, options);
   const creationRate =
     occupation.demandElasticity * ELASTICITY_PASS_THROUGH + occupation.newRoleIntensity;
-  return freed * creationRate * level.reinstatementShare * jurisdiction.dynamism * REINSTATEMENT_STRENGTH;
+  return (
+    freed *
+    creationRate *
+    level.reinstatementShare *
+    jurisdiction.dynamism *
+    REINSTATEMENT_STRENGTH *
+    industry.demandTrend *
+    ageBand.reinstatementMultiplier
+  );
 }
 
 /** Employment change vs. the no-AI counterfactual, as a fraction. */
-function netChange(occupation, level, jurisdiction, year, scenario = 1) {
+function netChange(occupation, level, jurisdiction, year, options = {}) {
   return (
-    reinstatement(occupation, level, jurisdiction, year, scenario) -
-    displacement(occupation, level, jurisdiction, year, scenario)
+    reinstatement(occupation, level, jurisdiction, year, options) -
+    displacement(occupation, level, jurisdiction, year, options)
   );
 }
 
@@ -929,10 +1127,20 @@ function netChange(occupation, level, jurisdiction, year, scenario = 1) {
  * entry level, which has both the largest headcount effect and the highest
  * baseline hire rate, is where the damage becomes visible first.
  *
+ * Age acts here as an amplifier of the AI effect, not as a level shift.
+ * Older applicants absorb more of the downside and capture less of the
+ * upside. It is written this way so that a cohort with no AI effect shows no
+ * age effect either: age bias in hiring exists in the no-AI counterfactual
+ * too, and this model measures the difference from that counterfactual, not
+ * the absolute state of the labour market.
+ *
  * Floored at -1: you cannot hire fewer than nobody.
  */
-function hiringChange(headcountDelta, level) {
-  return Math.max(-1, headcountDelta / level.baselineHireRate);
+function hiringChange(headcountDelta, level, options = {}) {
+  const { ageBand } = resolveOptions(options);
+  const raw = headcountDelta / level.baselineHireRate;
+  const aged = raw < 0 ? raw / ageBand.hiringMultiplier : raw * ageBand.hiringMultiplier;
+  return Math.max(-1, aged);
 }
 
 /**
@@ -944,20 +1152,22 @@ function project({
   jurisdictions = JURISDICTIONS,
   years = PROJECTION_YEARS,
   scenario = 'central',
+  industry,
+  ageBand,
 } = {}) {
-  const multiplier = SCENARIOS[scenario];
-  if (multiplier === undefined) {
+  if (typeof scenario === 'string' && SCENARIOS[scenario] === undefined) {
     throw new Error(`unknown scenario ${scenario}; expected one of ${Object.keys(SCENARIOS).join(', ')}`);
   }
+  const options = resolveOptions({ scenario, industry, ageBand });
 
   const rows = [];
   for (const occupation of occupations) {
     for (const level of experienceLevels) {
       for (const jurisdiction of jurisdictions) {
-        let previousNet = netChange(occupation, level, jurisdiction, BASE_YEAR, multiplier);
+        let previousNet = netChange(occupation, level, jurisdiction, BASE_YEAR, options);
         for (const year of years) {
-          const displaced = displacement(occupation, level, jurisdiction, year, multiplier);
-          const reinstated = reinstatement(occupation, level, jurisdiction, year, multiplier);
+          const displaced = displacement(occupation, level, jurisdiction, year, options);
+          const reinstated = reinstatement(occupation, level, jurisdiction, year, options);
           const net = reinstated - displaced;
           const index = 100 * (1 + net);
 
@@ -970,14 +1180,17 @@ function project({
             experience: level.name,
             jurisdiction: jurisdiction.name,
             code: jurisdiction.code,
+            industry: options.industry.name,
+            ageBand: options.ageBand.name,
             year,
-            deployment: deploymentShare(jurisdiction, year, multiplier),
+            extrapolated: year >= EXTRAPOLATION_FROM,
+            deployment: deploymentShare(jurisdiction, year, options),
             displacement: displaced,
             reinstatement: reinstated,
             netChange: net,
             employmentIndex: index,
             yoyChange: delta / (1 + previousNet),
-            hiringChange: hiringChange(delta, level),
+            hiringChange: hiringChange(delta, level, options),
           });
           previousNet = net;
         }
@@ -997,11 +1210,14 @@ function project({
 
 const CSV_FIELDS = [
   'year',
+  'extrapolated',
   'jurisdiction',
   'code',
   'occupation',
   'group',
   'experience',
+  'industry',
+  'ageBand',
   'deployment',
   'displacement',
   'reinstatement',
@@ -1123,6 +1339,17 @@ function orgImpact(rows, orgShape, year) {
   };
 }
 
+/**
+ * Mark a year heading as extrapolated.
+ *
+ * A bare number invites a 2036 figure to be read with the same confidence as
+ * a 2027 one. The dagger is the cheapest way to keep that distinction on
+ * screen in plain text; the charts shade the same region.
+ */
+function yearLabel(year, extrapolationFrom) {
+  return year >= extrapolationFrom ? `${year}†` : String(year);
+}
+
 /** Cells with the largest projected decline, worst first. */
 function mostExposedCells(rows, year, limit = 10) {
   return rows
@@ -1143,6 +1370,8 @@ const POS_STEPS = ['--pos-1', '--pos-2', '--pos-3', '--pos-4', '--pos-5'];
 const state = {
   occupation: 'Software engineering',
   jurisdiction: 'United States',
+  industry: INDUSTRIES[0].name,
+  ageBand: AGE_BANDS[0].name,
   year: 2030,
   scenario: 'central',
   measure: 'netChange',
@@ -1164,18 +1393,20 @@ function measureLabel() {
   return state.measure === 'netChange' ? 'headcount' : 'annual openings';
 }
 
-function rowsFor(filter = {}) {
-  return project({ scenario: state.scenario }).filter((r) =>
-    Object.entries(filter).every(([k, v]) => r[k] === v),
-  );
-}
-
-let cachedScenario = null;
+// The grid is recomputed whenever the scenario, industry or age band change,
+// and cached in between — those three are the only inputs the model itself
+// depends on. Everything else is filtering over the result.
+let cacheKey = null;
 let cachedRows = null;
 function allRows() {
-  if (cachedScenario !== state.scenario) {
-    cachedRows = project({ scenario: state.scenario });
-    cachedScenario = state.scenario;
+  const key = `${state.scenario}|${state.industry}|${state.ageBand}`;
+  if (cacheKey !== key) {
+    cachedRows = project({
+      scenario: state.scenario,
+      industry: state.industry,
+      ageBand: state.ageBand,
+    });
+    cacheKey = key;
   }
   return cachedRows;
 }
@@ -1272,6 +1503,30 @@ function renderTrajectory() {
     'aria-label': `Projected change in ${measureLabel()} for ${state.occupation} in ${state.jurisdiction}, by experience level, 2026 to 2030`,
   });
 
+  // The extrapolation region, drawn first so everything else sits on top of
+  // it. Past the last observation the model is only checking itself, and the
+  // chart should say so rather than letting 2036 look like 2027.
+  const boundary = x(EXTRAPOLATION_FROM - 0.5);
+  svg.append(
+    el('rect', {
+      x: boundary, y: m.top,
+      width: width - m.right - boundary, height: height - m.top - m.bottom,
+      fill: cssVar('--grid'), opacity: 0.4,
+    }),
+  );
+  svg.append(
+    el('line', {
+      x1: boundary, x2: boundary, y1: m.top, y2: height - m.bottom,
+      stroke: cssVar('--axis'), 'stroke-width': 1,
+    }),
+  );
+  svg.append(
+    el('text', {
+      x: boundary + 7, y: m.top + 13,
+      fill: cssVar('--muted'), 'font-size': 10,
+    }, 'extrapolation — no observational support'),
+  );
+
   // gridlines: solid hairlines, one shade off the surface
   const ticks = 6;
   for (let i = 0; i <= ticks; i += 1) {
@@ -1303,14 +1558,17 @@ function renderTrajectory() {
     }, 'no-AI baseline'),
   );
 
-  for (const year of years) {
+  // Eleven year labels will not fit legibly, so label alternate years and
+  // let the hover bands carry the rest.
+  years.forEach((year, i) => {
+    if (i % 2 !== 0 && i !== years.length - 1) return;
     svg.append(
       el('text', {
         x: x(year), y: height - m.bottom + 20, 'text-anchor': 'middle',
         fill: cssVar('--muted'), 'font-size': 11,
       }, String(year)),
     );
-  }
+  });
 
   for (const s of series) {
     const d = s.points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.year)},${y(p.value)}`).join(' ');
@@ -1376,7 +1634,8 @@ function renderTrajectory() {
           return `<div><span style="color:${s.color}">●</span> ${s.name} &nbsp;${fmtPct(p.value)}</div>`;
         })
         .join('');
-      showTip(event, `<strong>${year} &middot; ${measureLabel()}</strong>${lines}`);
+      const flag = year >= EXTRAPOLATION_FROM ? ' &middot; extrapolated' : '';
+      showTip(event, `<strong>${year} &middot; ${measureLabel()}${flag}</strong>${lines}`);
     });
     band.addEventListener('mouseleave', hideTip);
     svg.append(band);
@@ -1407,8 +1666,10 @@ function renderTrajectory() {
       : 'The gap between the top and bottom lines is the story: the same technology, the same market, a different career stage.');
 
   buildTable('traj-table', {
-    caption: `Change in ${measureLabel()}, ${state.occupation}, ${state.jurisdiction}`,
-    columns: ['Experience level', ...years.map(String)],
+    caption:
+      `Change in ${measureLabel()}, ${state.occupation}, ${state.jurisdiction}. ` +
+      `† marks extrapolated years, from ${EXTRAPOLATION_FROM} on.`,
+    columns: ['Experience level', ...years.map((y) => yearLabel(y, EXTRAPOLATION_FROM))],
     rows: series.map((s) => [s.name, ...s.points.map((p) => fmtPct(p.value))]),
   });
 }
@@ -1758,9 +2019,22 @@ function renderAll() {
 
 function init() {
   fillSelect($('f-occupation'), OCCUPATIONS.map((o) => o.name), state.occupation);
+  fillSelect($('f-industry'), INDUSTRIES.map((i) => i.name), state.industry);
   fillSelect($('f-jurisdiction'), JURISDICTIONS.map((j) => j.name), state.jurisdiction);
-  fillSelect($('f-year'), PROJECTION_YEARS.map(String), String(state.year));
+  fillSelect($('f-age'), AGE_BANDS.map((a) => a.name), state.ageBand);
   fillSelect($('f-scenario'), Object.keys(SCENARIOS), state.scenario);
+
+  // Year options keep the dagger so the extrapolation warning survives even
+  // when the reader is looking at a single-year view.
+  const yearSelect = $('f-year');
+  yearSelect.replaceChildren();
+  for (const year of PROJECTION_YEARS) {
+    const option = document.createElement('option');
+    option.value = String(year);
+    option.textContent = yearLabel(year, EXTRAPOLATION_FROM);
+    if (year === state.year) option.selected = true;
+    yearSelect.append(option);
+  }
 
   // The ranking chart needs its own level selector; it lives in the same
   // filter row rather than inside the card.
@@ -1776,7 +2050,9 @@ function init() {
   select.addEventListener('change', renderRanking);
 
   $('f-occupation').addEventListener('change', (e) => { state.occupation = e.target.value; renderAll(); });
+  $('f-industry').addEventListener('change', (e) => { state.industry = e.target.value; renderAll(); });
   $('f-jurisdiction').addEventListener('change', (e) => { state.jurisdiction = e.target.value; renderAll(); });
+  $('f-age').addEventListener('change', (e) => { state.ageBand = e.target.value; renderAll(); });
   $('f-year').addEventListener('change', (e) => { state.year = Number(e.target.value); renderAll(); });
   $('f-scenario').addEventListener('change', (e) => { state.scenario = e.target.value; renderAll(); });
   $('f-measure').addEventListener('change', (e) => { state.measure = e.target.value; renderAll(); });

@@ -42,8 +42,12 @@ test('deployment approaches capacity in the long run', () => {
 
 test('a faster scenario deploys earlier than a slower one', () => {
   for (const year of PROJECTION_YEARS) {
-    assert.ok(deploymentShare(us, year, 1.45) > deploymentShare(us, year, 1.0));
-    assert.ok(deploymentShare(us, year, 1.0) > deploymentShare(us, year, 0.65));
+    assert.ok(
+      deploymentShare(us, year, { scenario: 1.45 }) > deploymentShare(us, year, { scenario: 1.0 }),
+    );
+    assert.ok(
+      deploymentShare(us, year, { scenario: 1.0 }) > deploymentShare(us, year, { scenario: 0.65 }),
+    );
   }
 });
 

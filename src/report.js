@@ -7,11 +7,14 @@
 
 export const CSV_FIELDS = [
   'year',
+  'extrapolated',
   'jurisdiction',
   'code',
   'occupation',
   'group',
   'experience',
+  'industry',
+  'ageBand',
   'deployment',
   'displacement',
   'reinstatement',
@@ -131,6 +134,17 @@ export function orgImpact(rows, orgShape, year) {
     totalDelta,
     totalChange: totalBaseline ? totalDelta / totalBaseline : 0,
   };
+}
+
+/**
+ * Mark a year heading as extrapolated.
+ *
+ * A bare number invites a 2036 figure to be read with the same confidence as
+ * a 2027 one. The dagger is the cheapest way to keep that distinction on
+ * screen in plain text; the charts shade the same region.
+ */
+export function yearLabel(year, extrapolationFrom) {
+  return year >= extrapolationFrom ? `${year}†` : String(year);
 }
 
 /** Cells with the largest projected decline, worst first. */
